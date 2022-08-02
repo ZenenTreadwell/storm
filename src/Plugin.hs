@@ -20,10 +20,14 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import Data.Aeson 
 import Data.Aeson.Types ( parseMaybe )
-import Data.Text  
+import Data.Aeson.Lens
+import Data.Aeson.Key
+import Control.Lens hiding ((.=))
+import Data.Text (Text, pack)  
 import Control.Monad ((>>=))
 import Data.Maybe
 import Data.Conduit
+import Data.Foldable 
 
 plug :: ConduitT (Fin (Req Value)) S.ByteString IO () 
 plug = a .| b .| c 
@@ -48,7 +52,7 @@ b = evalStateT l Nothing
     l = lift await >>= monad 
     monad (Just( (Left r))) = lift $ yield r  
     monad (Just (Right (Nothing, m, p) )) = do 
-        -- NOTIFICATION NO YIELD  a
+        -- NOTIFICATION NO YIELD  
         case m of 
             "channel_opened"         -> pure ()    
             "channel_state_changed"  -> pure ()    
@@ -61,12 +65,13 @@ b = evalStateT l Nothing
             "sendpay_success"        -> pure ()    
             "sendpay_failure"        -> pure ()    
             "coin_movement"          -> pure ()    
-            "balance_snapshot"       -> pure ()    
+            "balance_snapshot"       -> pure ()
+                
             "openchannel_peer_sigs"  -> pure ()    
             "shutdown"               -> pure ()    
             otherwise                -> pure ()       
     monad (Just (Right (Just i, m, p))) = 
-        let rc = lift $ yield $ Res re i 
+        let rc = lift $ yield $ Res green i 
         in do 
             case m of
                 -- INITIALIZATION 
@@ -89,13 +94,19 @@ b = evalStateT l Nothing
                 "onion_message_blinded" -> rc 
                 "onion_message_ourpath" -> rc 
                 -- CUSTOM RPC
-                "stormcircle" -> rc
+                "stormcircle" -> do  
+                    rc 
+                    --n <- liftIO $ getNode' (filter ((/=) '\"') (show $ frip p) ) 
+                    --x <- liftIO $ getCircles n 
+                    --lift $ yield $ Res (msg.pack.show $ x) i
                 "stormsize" -> do 
-                    mb <- liftIO $ getSize 
-                    lift $ yield $ Res (msg $ pack $ show  mb ) i
+                    mb <- liftIO $ getSize
+                    lift $ yield $ Res (object [
+                        "distance, new nodes encountered" .= (tail' $ histo mb)  
+                        ]) i
                 "stormcandidates" -> do 
-                    c <- liftIO $ getCandidates  
-                    lift $ yield $ Res (msg $ pack $ show $ top c) i 
+                    c <- liftIO $ getCandidates
+                    lift $ yield $ Res (msg $ pack $ show $ nodeId <$> top c) i 
                 "stormload" -> do 
                     handle <- liftIO $ readIORef ioref 
                     w <- liftIO $ getinfo handle
@@ -104,28 +115,44 @@ b = evalStateT l Nothing
                             xl <- liftIO $ listchannels handle (__id g) 
                             case xl of 
                                 (Just (Correct (Res xl' _))) -> do
-                                    case toNode xl' of 
-                                        Just n -> do 
-                                            x <- liftIO $ leaveCrumbs handle n
-                                            lift $ yield $ Res re i
-                                        Nothing -> rc
+                                    x <- liftIO $ leaveCrumbs handle (toNode xl')
+                                    mb <- liftIO $ getSize
+                                    lift $ yield $ Res (object [
+                                          "nodes" .= mSize mb 
+                                        , "capacity (sat)" .= mCapacity mb
+                                        ]) i
                                 a -> lift $ yield $ Res (msg $ (pack $ show g)) i  
-                        a -> rc 
-                "stormdeploy" -> rc 
+                        a -> rc
+                "stormnode" -> do
+                    h <- liftIO $ readIORef ioref
+                    n <- liftIO $ getNode h (filter ((/=) '\"') (show $ frip p) ) 
+                    lift $ yield $ Res (object [
+                          "nodeid" .= nodeId n 
+                        , "channels" .= (length.edges) n 
+                        , "capacity" .=  sum (map sats $ edges n)
+                        , "paths to:" .= crumbs n 
+                        ]) i
+                "stormdeploy" -> rc
                 "stormrebalance" -> rc
-                "stormbot" -> rc 
-                -- BCLI OVERIDE (not enabled) 
-                "getchaininfo" -> rc 
+                "stormbot" -> rc
+                -- BCLI OVERIDE (not enabled)
+                "getchaininfo" -> rc
                 "estimatefees" -> rc
-                "getrawblockbyheight" -> rc 
-                "getutxout" -> rc 
-                "sendrawtransaction" -> rc  
-                otherwise ->  pure ()
-    monad _ = pure () 
+                "getrawblockbyheight" -> rc
+                "getutxout" -> rc
+                "sendrawtransaction" -> rc
+                otherwise ->  rc
+    monad _ = pure ()
+
+frip :: Value -> Text 
+frip v = case v ^? nth 0 . _String of
+    (Just b) ->  b
+    Nothing -> ""
 
 c :: ConduitT (Res Value) S.ByteString IO () 
 c = await >>= maybe mempty (\v -> yield $ L.toStrict $ encode v)  
 
-re = object [ "result" .= ("continue"::Text) ]
+green = object [ "result" .= ("continue"::Text) ]
 msg x = object ["sigh" .= x] 
-
+tail' [] = [] 
+tail' x = tail x 

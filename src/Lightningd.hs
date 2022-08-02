@@ -10,6 +10,11 @@ import GHC.Generics
 import Data.Aeson
 import Data.Aeson.Types 
 
+--PLUG data
+
+
+
+--RPC data
 data Invoice = Invoice {
           payment_hash :: String
         , expires_at :: Int

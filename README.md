@@ -1,24 +1,24 @@
-######Haskell Stack Storm 
-stack init 
-stack build ## Observe executable location, add to CLN plugins
+######Haskell Stack Storm
+stack init
+stack build
 
-ln -s \<executable-location\>/storm  ./.lightning/plugins/ ## via link auto updates on recompile
+  Lib  ##
 
-New lightning-cli commands include: 
-- stormload
-- stormsize
-- stormcandidates
-- stormcircles
-- ... check src/Manifest.hs 
+  Cli.hs           ## unix socket lightning-rpc
+  Jspec.hs         ## json conduit
+  Nodes.hs         ## map of nodes
+  Lightningd.hs    ## plugin data
+  Plugin.hs        ## storm api
+  Manifest.hs      ## cln init
 
-Files Purposes: 
+  Exe ## storm
 
-app/Main.hs          ## executable 
-src/Jspec.hs         ## json conduit
-src/Nodes.hs         ## map/graph of nodes
-src/Cli.hs           ## rpc client
-src/Lightningd.hs    ## json spec
-src/Plugout.hs       ## plugin handler conduit
-src/Manifest.hs      ## plugin configurationa
+  Main.hs  ## executable plugin 
+
+example : 
+- stormload    ## creates a map of nodes/paths in memory  
+- stormsize    ## inspect map summary 
+- stormnode    ## inspect node  
+- ... check Manifest  // Plugin wip
 
 

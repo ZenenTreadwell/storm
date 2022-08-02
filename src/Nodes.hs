@@ -1,9 +1,9 @@
 {-# LANGUAGE 
-        LambdaCase,
-        OverloadedStrings, 
-        DeriveGeneric, 
-        FlexibleInstances, 
-        FlexibleContexts 
+    LambdaCase,
+    OverloadedStrings, 
+    DeriveGeneric, 
+    FlexibleInstances, 
+    FlexibleContexts 
 #-} 
 
 module Nodes where 
@@ -19,58 +19,63 @@ import Data.Aeson.Types (parseMaybe)
 import Data.Maybe
 import Control.Monad
 import GHC.IORef
-import System.IO.Unsafe
 import Data.Text (Text) 
+import System.IO.Unsafe
+import System.IO
 import Data.Foldable
+import Control.Monad.Trans.State
 import qualified Data.Map.Strict as H
 type HT k v = H.Map k v
-log' = System.IO.appendFile "/home/taylor/Projects/storm/t.txt"
+
 mapref :: IORef (HT NodeId Node) 
 mapref = unsafePerformIO $ newIORef H.empty
 {-# NOINLINE mapref #-} 
 
-type Base = Int
-type Ppm = Int
 type Sat = Int 
 type Msat = Int
 type NodeId = String
 type ShortId = String
 data Fee = Fee {
-      base :: Base 
-    , ppm :: Ppm 
+      base :: Int 
+    , ppm :: Int 
     } deriving (Show, Generic, Eq)  
 instance ToJSON Fee
-newtype Route = Route [Edge] deriving Generic 
-instance ToJSON Route 
+
+em = Node "" [] [] Nothing -- remove need for this
 data Node = Node {
       nodeId :: NodeId
     , edges :: [Edge] 
-    , crumbs :: Crumbs
+    , crumbs :: [Crumb]
+    , peer :: Maybe Peer
     } deriving (Show)    
+
+data Peer = Peer { 
+    bal :: Sat 
+    } deriving (Show, Eq)
+
+data Crumb = Crumb {
+      crumber :: Int
+    , cost :: Fee 
+    , neck :: Sat   
+    , arrow :: Edge
+    } deriving (Generic, Show, Eq) 
+instance ToJSON Crumb
+
 data Edge = Edge {
       target :: NodeId
     , shortId :: ShortId
     , sats :: Sat 
     , fee :: Fee 
-    } deriving (Show, Generic)
+    } deriving (Show, Generic, Eq)
 instance ToJSON Edge   
-em = Node "" [] []
 
 loadNode :: Handle -> NodeId -> IO Node
 loadNode handle i = do 
     g <- listchannels handle i 
-    h <- readIORef mapref 
+    nodemap <- readIORef mapref 
     case g of 
-        (Just (Correct (Res l _))) -> 
-            case toNode l of 
-                (Just node) -> do 
-                    liftIO $ log' $ nodeId node
-                    liftIO $ writeIORef mapref (H.insert i node h)  
-                    pure node 
-                Nothing -> do 
-                    liftIO $ log' $ i <> "    failde\n"
-                    pure em
-        otherwise -> pure em 
+        (Just (Correct (Res l _))) -> pure $ toNode l  
+        otherwise                   -> pure em 
 
 getNode :: Handle -> NodeId -> IO Node   
 getNode handle k = do 
@@ -79,118 +84,118 @@ getNode handle k = do
         (Just n) -> pure n
         Nothing ->  loadNode handle k  
 
-data Crumb = Crumb {
-      crumber :: Int
-    , cost :: Fee 
-    , neck :: Sat   
-    , arrow :: ShortId 
-    } deriving (Generic, Show, Eq) 
-instance ToJSON Crumb
-type Crumbs = [Crumb]  
+getNode' :: NodeId -> IO Node 
+getNode' k = do
+    nodemap <- readIORef mapref 
+    case H.lookup k nodemap of
+        (Just n) -> pure n
+        Nothing -> pure em 
+
+getCircles fulc = undefined --do --
+  --  liftIO $ System.IO.appendFile t $ "search crumbs " <> (show.length.crumbs) fulc 
+  --  mapM (followCrumb []) $ crumbs fulc
+
+followCrumb p c 
+    | crumber c == 0 = do 
+        liftIO $ mapM (\s -> getNode' s) p
+    | otherwise = do 
+        n <- getNode' $ target e
+        followCrumb (nxtP n) (nxtCrumb n) 
+        where 
+           e = arrow c 
+           nxtP n = (nodeId n):p 
+           nxtCrumb n = head $ sort $ crumbs n
+     
 leaveCrumbs :: Handle -> Node -> IO ()  
-leaveCrumbs handle n = do
-    go (Crumb 0 (Fee 0 0) 0 "") n 
+leaveCrumbs handle n = go (Crumb 0 mempty maxBound (Edge "home" "home" 0 mempty) )  n 
     where 
         go crumb _ 
-            | crumber crumb > 21 = pure () 
-        go crumb n@(Node i cx []) = do 
+            | crumber crumb > 21 = pure ()
+        go crumb n@(Node i cx [] _) = do
             h <- readIORef mapref
-            liftIO $ writeIORef mapref (H.insert i (Node i cx (crumb:[])) h)
+            liftIO $ writeIORef mapref (H.insert i (Node i cx (crumb:[]) Nothing) h)
             liftIO $ mapM_ channelGo cx
-            where 
+            where
                 channelGo c = do 
-                    node <- liftIO $ getNode handle (target c) 
-                    go (crumpdate crumb c) node 
-        go crumb n@(Node i c b) = do 
+                    node <- liftIO $ getNode handle (target c)
+                    go (crumpdate crumb c node) node
+        go crumb n@(Node i c b _) = do
             h <- readIORef mapref
-            liftIO $ writeIORef mapref (H.insert i (Node i c (crumb : b)) h)
+            liftIO $ writeIORef mapref (H.insert i (Node i c (crumb : b) Nothing) h )
 
-crumpdate :: Crumb -> Edge -> Crumb 
-crumpdate cr e =
+crumpdate :: Crumb -> Edge -> Node -> Crumb 
+crumpdate cr e n =
     Crumb 
         (crumber cr + 1) 
-        (Fee ((base.cost) cr + (base.fee) e) ((ppm.cost) cr + (ppm.fee) e) ) 
+        (Fee ((base.cost) cr + (base.fee) e) (avger ((ppm.cost) cr) ((ppm.fee) e)) )
         (min (neck cr) (sats e))
-        (shortId e)
+        e 
+
+head' [] = undefined 
+head' (x:_) = x
 
 getSize = do 
     h <- readIORef mapref 
-    pure $ H.size h
- 
+    pure $ H.foldr summarer (Mview 0 0 []) h
+    where 
+        summarer :: Node -> Mview -> Mview 
+        summarer (Node _ ch cr _) (Mview s c h) =
+            Mview (s + 1) (c + sum (map sats ch)) (addMin (crumber.minimum $ cr) h)  
+        addMin d h = case lookup d h of
+            Nothing -> insert (d, 1) h 
+            Just j  -> insert (d, j + 1) (filter ((d /=).fst)  h)  
+
+data Mview = Mview {
+      mSize :: Int
+    , mCapacity :: Sat 
+    , histo :: [(Int, Int)]    
+} deriving (Show) 
+
 data Pick = Pick {
       top :: [Node]
     } deriving Show
 
 getCandidates = do 
     h <- readIORef mapref 
-    pure $ H.foldr picker (Pick []) h 
+    pure $ Pick $ toList $ H.filter inel h 
     where 
-        picker :: Node -> Pick -> Pick
-        picker n@(Node i e b) (Pick []) = Pick (n : [])   
-        picker n@(Node i e b) (Pick top) 
-            | length top < 1 = Pick (n : top) 
-            | otherwise = Pick $ take 1 $ sort $ n : top
+        inel :: Node -> Bool
+        inel n@(Node i e b _)  
+            | crumber (head' b) < 11    = False  
+            | length e < 5             = False
+            | otherwise                = True
 
-instance Eq Node where 
-    (==) (Node i _ _ ) (Node i' _ _ ) = i == i'
-instance Ord Node where 
-    compare x y 
-        | x == y = EQ 
-    compare blue@(Node _ cb b) red@(Node _ cr r) = 
-        let ncb = length b
-            ncr = length r 
-            neckdiff = div ((neck $ fold b) - (neck $ fold r)) 1000000 
-       in compare (ncb ) (ncr)   
-        
 instance Ord Crumb where 
     compare bc rc = compare (crumber bc) $ (crumber rc)  
-instance Monoid Crumb where 
-    mempty = Crumb 0 mempty 0 "" 
-
+instance Monoid Fee where 
+    mempty = Fee 0 0 
 instance Semigroup Fee where 
     (Fee b p) <> (Fee b' p') = Fee b'' p''
         where 
-            b'' = (div (b + b') 2)
-            p'' = (div (p + p') 2)
+            b'' = avger b b'
+            p'' = avger p p'
 
-
-instance Monoid Edge where 
-    mempty = Edge "" "" 0 mempty
-instance Monoid Fee where 
-    mempty = Fee 0 0 
-
-instance Semigroup Edge where 
-    (Edge o i s f) <> (Edge _ _ s' f') = Edge o i (s + s') (f <> f') 
-
-instance Semigroup Crumb where 
-    (Crumb c f n a) <> (Crumb c' f' n' a') = Crumb 
-        (min c c') 
-        (f <> f')  
-        ((+) n n')
-        a  
- 
-toNode :: ListChannels -> Maybe Node 
-toNode (ListChannels x@(a:_)) = 
+avger n n' = (div (n + n') 2)
+toNode :: ListChannels -> Node 
+toNode (ListChannels x@(a:l)) = 
     let i = source a
-    in Just $ Node i (map toEdge x) []
-toNode (ListChannels []) = Nothing 
+    in Node i (map toEdge x) [] Nothing
+toNode (ListChannels []) = em
+toEdge :: Channel -> Edge 
 toEdge c = Edge (destination c) (short_channel_id c) (satoshis c) (
     Fee (base_fee_millisatoshi c) (fee_per_millionth c) ) 
-(*&*) :: NodeId -> [Route] -> Bool
-a *&* ((Route []):ssx) = a *&* ssx
-a *&* ((Route (x:sx)):ssx) = a /= (target x) && a *&* ((Route sx) : ssx)  
-addEdge :: Edge -> Route -> Route 
-addEdge e (Route r) =  Route (e:r) 
-toRoute :: Edge -> Route
-toRoute e = Route $ e : [] 
-
-calcTotalFee :: Route -> Msat -> Msat 
-calcTotalFee r amt = go (0::Msat) r amt 
-        where 
-            go :: Msat -> Route -> Msat -> Msat
-            go z (Route [])  _ = z 
-            go z (Route ((Edge _ _ _ (Fee b p)):r)) a = go (z + calcFee b p a) (Route r) a  
-            m :: Int 
-            m = 1000000
-            calcFee :: Msat -> Msat -> Msat -> Msat
-            calcFee base ppm amt = amt * m * ppm `div` (m * m) + base 
+--(*&*) :: NodeId -> [Route] -> Bool
+--a *&* ((Route []):ssx) = a *&* ssx
+--a *&* ((Route (x:sx)):ssx) = a /= (target x) && a *&* ((Route sx) : ssx)  
+--addEdge :: Edge -> Route -> Route 
+--addEdge e (Route r) =  Route (e:r) 
+--calcTotalFee r amt = go (0::Msat) r amt 
+--    where 
+--        go :: Msat -> Route -> Msat -> Msat
+--        go z (Route [])  _ = z 
+--        go z (Route ((Edge _ _ _ (Fee b p)):r)) a = go (z + calcFee b p a) (Route r) a  
+--        m :: Int 
+--        m = 1000000
+--        calcFee :: Msat -> Msat -> Msat -> Msat
+--        calcFee base ppm amt = amt * m * ppm `div` (m * m) + base 
+t = "/home/taylor/Projects/storm/t.log"
