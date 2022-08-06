@@ -94,15 +94,19 @@ b = evalStateT l Nothing
                 "onion_message_blinded" -> rc 
                 "onion_message_ourpath" -> rc 
                 -- CUSTOM RPC
-                "stormcircle" -> do  
-                    rc 
-                    --n <- liftIO $ getNode' (filter ((/=) '\"') (show $ frip p) ) 
-                    --x <- liftIO $ getCircles n 
-                    --lift $ yield $ Res (msg.pack.show $ x) i
-                "stormsize" -> do 
+                "stormcircle" ->   
+                    (liftIO $ lookupNode (filter ((/=) '\"') (show $ frip p) )) >>= 
+                    \case 
+                        Just n ->  do 
+                            x <- liftIO $ getCircles n 
+                            lift $ yield $ Res (msg.pack.show $ x) i
+                        Nothing -> rc
+                "stormsize" -> do
                     mb <- liftIO $ getSize
                     lift $ yield $ Res (object [
-                        "distance, new nodes encountered" .= (tail' $ histo mb)  
+                          "nodes" .= mSize mb
+                        , "capacity (sat)" .= mCapacity mb
+                        , "distance, new nodes encountered" .= (tail' $ histo mb)  
                         ]) i
                 "stormcandidates" -> do 
                     c <- liftIO $ getCandidates
@@ -125,7 +129,7 @@ b = evalStateT l Nothing
                         a -> rc
                 "stormnode" -> do
                     h <- liftIO $ readIORef ioref
-                    n <- liftIO $ getNode h (filter ((/=) '\"') (show $ frip p) ) 
+                    n <- liftIO $ lookupNode' (filter ((/=) '\"') (show $ frip p) ) 
                     lift $ yield $ Res (object [
                           "nodeid" .= nodeId n 
                         , "channels" .= (length.edges) n 
@@ -135,7 +139,7 @@ b = evalStateT l Nothing
                 "stormdeploy" -> rc
                 "stormrebalance" -> rc
                 "stormbot" -> rc
-                -- BCLI OVERIDE (not enabled)
+                -- BCLI OVERIDE (not enabled) - from electrum servers ?
                 "getchaininfo" -> rc
                 "estimatefees" -> rc
                 "getrawblockbyheight" -> rc
