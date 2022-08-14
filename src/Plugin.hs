@@ -9,6 +9,7 @@ import Manifest (manifest)
 import Lightningd 
 import Cli
 import Nodes
+import Graph 
 import System.IO
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class 
@@ -24,6 +25,7 @@ import Data.Aeson.Lens
 import Data.Aeson.Key
 import Control.Lens hiding ((.=))
 import Data.Text (Text, pack)  
+import Data.Graph.Inductive.Graph (size, order) 
 import Control.Monad ((>>=))
 import Data.Maybe
 import Data.Conduit
@@ -66,7 +68,6 @@ b = evalStateT l Nothing
             "sendpay_failure"        -> pure ()    
             "coin_movement"          -> pure ()    
             "balance_snapshot"       -> pure ()
-                
             "openchannel_peer_sigs"  -> pure ()    
             "shutdown"               -> pure ()    
             otherwise                -> pure ()       
@@ -111,12 +112,19 @@ b = evalStateT l Nothing
                 "stormcandidates" -> do 
                     c <- liftIO $ getCandidates
                     lift $ yield $ Res (msg $ pack $ show $ nodeId <$> top c) i 
+                "stormgraph" -> do
+                    handle <- liftIO $ readIORef ioref 
+                    gra <- liftIO $ loadGraph handle 
+                    lift $ yield $ Res (object [
+                                          "nodes" .= order gra 
+                                        , "edges" .= size gra 
+                                        ]) i
                 "stormload" -> do 
                     handle <- liftIO $ readIORef ioref 
                     w <- liftIO $ getinfo handle
                     case w of
                         (Just (Correct (Res g _))) -> do 
-                            xl <- liftIO $ listchannels handle (__id g) 
+                            xl <- liftIO $ channelsbysource handle (__id g) 
                             case xl of 
                                 (Just (Correct (Res xl' _))) -> do
                                     x <- liftIO $ leaveCrumbs handle (toNode xl')

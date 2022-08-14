@@ -42,7 +42,7 @@ getinfo h = do
                .| (jinjin :: ( ConduitT S.ByteString (Fin (Res GetInfo)) IO () ))
                .| (await >>= pure)      
 
-listchannels h source = do 
+channelsbysource h source = do 
     reqToHandle h $ Req ("listchannels"::Text) (object [ 
         "source" .= source 
         ]) (Just (Number 44))  
@@ -50,6 +50,18 @@ listchannels h source = do
                .| (jinjin :: (ConduitT S.ByteString (Fin (Res ListChannels)) IO () ))
                .| (await >>= pure)  
 
+allchannels h = do 
+    reqToHandle h $ Req ("listchannels"::Text) (object []) (Just $ Number 33)     
+    runConduit $ sourceHandle h 
+               .| (jinjin :: (ConduitT S.ByteString (Fin (Res ListChannels)) IO () ))
+               .| (await >>= pure)  
+
+allnodes h = do 
+    reqToHandle h $ Req ("listnodes"::Text) (object []) (Just $ Number 55)     
+    runConduit $ sourceHandle h 
+               .| (jinjin :: (ConduitT S.ByteString (Fin (Res ListNodes)) IO () ))
+               .| (await >>= pure)  
+ 
 fromInit v = case fromJSON v of 
     Success (InitConfig f g) -> f <> "/" <> g 
     otherwise -> "" 

@@ -50,6 +50,7 @@ data Req x = Req {
    getMethod :: Text,
    getParams :: x,
    getReqId :: Maybe Value }
+   deriving (Show) 
    
 data Res a =
     Res { getResBody :: a,

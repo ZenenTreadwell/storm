@@ -25,21 +25,17 @@ import System.IO
 import Data.Foldable
 import Control.Monad.Trans.State
 import qualified Data.Map.Strict as H
+
+
+
 type HT k v = H.Map k v
 
 mapref :: IORef (HT NodeId Node) 
 mapref = unsafePerformIO $ newIORef H.empty
 {-# NOINLINE mapref #-} 
 
-type Sat = Int 
-type Msat = Int
 type NodeId = String
 type ShortId = String
-data Fee = Fee {
-      base :: Int 
-    , ppm :: Int 
-    } deriving (Show, Generic, Eq)  
-instance ToJSON Fee
 
 em = Node "" [] [] Nothing -- remove 
 data Node = Node {
@@ -91,12 +87,11 @@ howFull _ = "\n****************\n^^^^^^\n"
 
 loadNode :: Handle -> NodeId -> IO Node
 loadNode handle i = do 
-    g <- listchannels handle i 
+    g <- channelsbysource handle i 
     nodemap <- readIORef mapref 
     case g of 
         (Just (Correct (Res l _))) -> pure $ toNode l  
         otherwise                  -> pure em -- xxx 
-    
 
 lookupNode :: NodeId -> IO (Maybe Node) 
 lookupNode i = (readIORef mapref) >>= (\map -> pure $ H.lookup i map) 
@@ -112,13 +107,13 @@ getCircles peera = mapM (genPath [] peera) (filter f $ crumbs peera)
 
 genPath :: [NodeId] -> Node -> Crumb -> IO [NodeId]
 genPath p n c 
+    | length ex == 0 = pure p 
     | hops c == 0 = pure p 
-    | otherwise = nextN >>= \case 
+    | otherwise = (liftIO $ lookupNode (target.head $ ex)) >>= \case 
         Just n' -> genPath ((nodeId n):p) n' (nextC n') 
-        Nothing -> pure [] 
+        Nothing -> pure p 
     where 
         ex = filter ((/= (arrow c)).shortId) $ edges n 
-        nextN = liftIO $ lookupNode (target.head $ ex) 
         nextC n'' = head $ filter (((==) (hops c - 1) ).hops) $  crumbs n''
  
 
@@ -130,22 +125,22 @@ leaveCrumbs handle n = go (Crumb 0 mempty maxBound "home")  n
     where 
         go crumb n 
             | hops crumb > 21 = pure ()
-        go crumb n@(Node i cx [] _) = do
+        go crumb n@(Node i cx [] p) = do
             h <- readIORef mapref 
-            liftIO $ writeIORef mapref $ (H.insert i (Node i cx (crumb : []) Nothing) h) 
+            liftIO $ writeIORef mapref $ (H.insert i (Node i cx (crumb : []) p) h) 
             liftIO $ mapM_ gogo cx
             where
                 gogo c = (lookupNode (target c)) >>= \case   
-                    Just node -> go (crumpdate crumb c node) node
+                    Just node -> go (crumpdate crumb c) node
                     Nothing -> (liftIO $ loadNode handle (target c)) >>= \node -> 
-                        go (crumpdate crumb c node) node
-        go crumb (Node i c b _) = do
+                        go (crumpdate crumb c) node
+        go crumb (Node i c b p) = do
             h <- readIORef mapref
-            liftIO $ writeIORef mapref $ (H.insert i (Node i c (crumb : b) Nothing) h)
+            liftIO $ writeIORef mapref $ (H.insert i (Node i c (crumb : b) p) h)
             pure ()
 
-crumpdate :: Crumb -> Edge -> Node -> Crumb 
-crumpdate cr e n =
+crumpdate :: Crumb -> Edge -> Crumb 
+crumpdate cr e =
     Crumb 
         (hops cr + 1) 
         (Fee ((base.cost) cr + (base.fee) e) (avger ((ppm.cost) cr) ((ppm.fee) e)) )

@@ -32,6 +32,7 @@ dependencies:
 - text 
 - transformers 
 - containers
+- fgl 
 
 library:
   source-dirs: src

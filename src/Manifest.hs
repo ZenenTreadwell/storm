@@ -13,7 +13,8 @@ manifest :: Value
 manifest = object [
     "options" .= ([]::[Option]), 
     "rpcmethods" .= ([
-          RpcMethod "stormload" "" "Loads map into memory" Nothing False  
+          RpcMethod "stormgraph" "" "Loads map into memory as graph" Nothing False  
+        , RpcMethod "stormload" "" "Loads map into memory" Nothing False  
         , RpcMethod "stormcircle" "" "Return all circular routes by size (ie triangle, square, ..)" Nothing False
         , RpcMethod "stormsize" "" "Return info about nodes stored in memory" Nothing False  
         , RpcMethod "stormcandidates" "" "Return list of far away nodeid." Nothing False 
