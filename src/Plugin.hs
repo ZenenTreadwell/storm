@@ -10,6 +10,7 @@ import Lightningd
 import Cli
 import Nodes
 import Graph 
+import Numeric
 import System.IO
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class 
@@ -94,7 +95,7 @@ b = evalStateT l Nothing
                 "rpc_command"           -> rc  
                 "onion_message_blinded" -> rc 
                 "onion_message_ourpath" -> rc 
-                -- CUSTOM RPC
+                -- CUSTOM RPC V1
                 "stormcircle" ->   
                     (liftIO $ lookupNode (filter ((/=) '\"') (show $ frip p) )) >>= 
                     \case 
@@ -112,13 +113,7 @@ b = evalStateT l Nothing
                 "stormcandidates" -> do 
                     c <- liftIO $ getCandidates
                     lift $ yield $ Res (msg $ pack $ show $ nodeId <$> top c) i 
-                "stormgraph" -> do
-                    handle <- liftIO $ readIORef ioref 
-                    gra <- liftIO $ loadGraph handle 
-                    lift $ yield $ Res (object [
-                                          "nodes" .= order gra 
-                                        , "edges" .= size gra 
-                                        ]) i
+    
                 "stormload" -> do 
                     handle <- liftIO $ readIORef ioref 
                     w <- liftIO $ getinfo handle
@@ -146,14 +141,30 @@ b = evalStateT l Nothing
                         ]) i
                 "stormdeploy" -> rc
                 "stormrebalance" -> rc
-                "stormbot" -> rc
-                -- BCLI OVERIDE (not enabled) - from electrum servers ?
+                -- V2
+                "v2stormload" -> do
+                    liftIO $ log'' "why would it rc??"
+                    handle <- liftIO $ readIORef ioref 
+                    gra <- liftIO $ loadGraph handle 
+                    lift $ yield $ Res (object [
+                                          "nodes" .= order gra 
+                                        , "edges" .= size gra 
+                                        ]) i
+                "v2stormsize" -> do 
+                    rc
+                "v2stormcircle" -> do 
+                    handle <- liftIO $ readIORef ioref
+                    cir <- liftIO $ findCircles.fst.head $ readHex "0353f8989329d9abf1030046dcea78c3d6e6297f18297e75c57dfde6f9b587515f" 
+                    lift $ yield $ Res (msg $ pack $ show $ length cir) i 
+                -- BCLI OVERIDE (not enabled) - via electrum?
                 "getchaininfo" -> rc
                 "estimatefees" -> rc
                 "getrawblockbyheight" -> rc
                 "getutxout" -> rc
                 "sendrawtransaction" -> rc
-                otherwise ->  rc
+                otherwise ->  do 
+                    liftIO $ log'' $ "anot caught correctly" <> (show m) 
+                    rc
     monad _ = pure ()
 
 frip :: Value -> Text 
@@ -168,3 +179,5 @@ green = object [ "result" .= ("continue"::Text) ]
 msg x = object ["sigh" .= x] 
 tail' [] = [] 
 tail' x = tail x 
+t' = "/home/taylor/Projects/storm/t.log"
+log'' msg = System.IO.appendFile t' msg 

@@ -26,8 +26,6 @@ import Data.Foldable
 import Control.Monad.Trans.State
 import qualified Data.Map.Strict as H
 
-
-
 type HT k v = H.Map k v
 
 mapref :: IORef (HT NodeId Node) 
