@@ -31,6 +31,7 @@ import GHC.Real
 import Data.List
 import Data.Maybe 
 
+--- XXX
 graphRef :: IORef (Gr Node' Edge')
 graphRef = unsafePerformIO $ newIORef empty 
 {-# NOINLINE graphRef #-}
@@ -44,7 +45,7 @@ data Edge' = E {
     , collat :: Sat
     , fees :: Fee   
     , mysat :: Maybe Sat 
-    , htlcs :: [Int] }
+    , htlcs :: Maybe [Int] }
     -- home :: Node 
 
 toEdge' :: Channel -> LEdge Edge' 
@@ -54,9 +55,10 @@ toEdge' c = (
     (E  
         (short_channel_id c) 
         (satoshis c) 
-        (Fee (base_fee_millisatoshi c) (fee_per_millionth c)) 
+        (Fee (base_fee_millisatoshi c) (fee_per_millionth c))  
         Nothing 
-        ([]) ))
+        Nothing
+    )) 
     
 toNode' :: NodeInfo -> LNode Node'
 toNode' n = ((fst.head $ readHex $ nodeid n), N (ali n) Nothing)
@@ -78,28 +80,39 @@ loadGraph h = (allchannels h) >>= \case
     otherwise -> pure empty  
 
 
--- Use label on node to never revisit (same solution as Nodes) 
--- whole point of fgl was inductive def not node marking 
 
+
+
+findCircles n = do 
+    g <- readIORef graphRef
+    pure (bft n g)
+
+
+
+
+
+
+-- findCircles' n g = xdffWith cFac [n] g 
+--cFac (incoming, n', _, outgoing) = undefined 
 
 
 -- dfs? wth is taking so long? -- nothing prevents researching e
-findCircles :: Node -> IO [Crumb]
-findCircles n = do
-    g <- readIORef graphRef
-    pure $ gogo g [homeCrumb n] [] 
-    where
-        gogo :: Gr Node' Edge' -> [ Crumb ] -> [ Crumb ] -> [ Crumb ]
-        gogo g [] fin = fin 
-        gogo g (x:xs) fin 
-            | (length.path) x > 5 = gogo g xs fin
-            | (last.path) x == (head.path) x && (length.path) x > 1 = gogo g xs (x:fin) 
-            | otherwise = gogo g ( (++) xtsd xs) fin 
-            where 
-                (incoming, n', _, outgoing) = context g ((head.path) x) 
-                xtsd :: [Crumb] 
-                xtsd = catMaybes $ map (crumpdate x) (nubBy unuq outgoing)
-                unuq (_, n1) (_, n2) = n1 == n2 
+--findCircles :: Node -> IO [Crumb]
+--findCircles n = do
+--    g <- readIORef graphRef
+--    pure $ gogo g [homeCrumb n] [] 
+--    where
+--        gogo :: Gr Node' Edge' -> [ Crumb ] -> [ Crumb ] -> [ Crumb ]
+--        gogo g [] fin = fin 
+--        gogo g (x:xs) fin 
+--            | (length.path) x > 5 = gogo g xs fin
+--            | (last.path) x == (head.path) x && (length.path) x > 1 = gogo g xs (x:fin) 
+--            | otherwise = gogo g ( (++) xtsd xs) fin 
+--            where 
+--                (incoming, n', _, outgoing) = context g ((head.path) x) 
+--                xtsd :: [Crumb] 
+--                xtsd = catMaybes $ map (crumpdate x) (nubBy unuq outgoing)
+--                unuq (_, n1) (_, n2) = n1 == n2 
 
 -- use shortest path tree?
 --findCircles n = (readIORef graphRef) >>= \g ->  
@@ -111,7 +124,8 @@ findCircles n = do
 --        fff :: Edge' -> Integer 
 --        fff e = toInteger (collat e)     
     
--- use labels on graph?
+-- Use label on node to never revisit (same solution as Nodes) 
+-- whole point of fgl was inductive def = avoid node marking 
 --findCircles n = do 
 --    g <- readIORef graphRef -- xxx
 --    pure $ gogo g (C 0 mempty maxBound []) (context g n)    
@@ -147,42 +161,4 @@ crumpdate cr (e, n2) =
             (Fee ((base.totalfees) cr + (base.fees) e) 0) -- ppm xxx 
             (min (neck cr) (collat e))
             (n2 : p)
-
-
-t = "/home/taylor/Projects/storm/t.log"
-log' msg = System.IO.appendFile t msg 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

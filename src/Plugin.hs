@@ -1,6 +1,6 @@
 {-# LANGUAGE 
-    LambdaCase,
-    OverloadedStrings
+      LambdaCase
+    , OverloadedStrings 
 #-}
 module Plugin where 
 
@@ -26,11 +26,13 @@ import Data.Aeson.Lens
 import Data.Aeson.Key
 import Control.Lens hiding ((.=))
 import Data.Text (Text, pack)  
-import Data.Graph.Inductive.Graph (size, order) 
+import Data.Graph.Inductive.Graph 
+import Data.Graph.Inductive.Query
 import Control.Monad ((>>=))
 import Data.Maybe
 import Data.Conduit
 import Data.Foldable 
+import Data.List 
 
 plug :: ConduitT (Fin (Req Value)) S.ByteString IO () 
 plug = a .| b .| c 
@@ -135,27 +137,46 @@ b = evalStateT l Nothing
                     n <- liftIO $ lookupNode' (filter ((/=) '\"') (show $ frip p) ) 
                     lift $ yield $ Res (object [
                           "nodeid" .= nodeId n 
-                        , "channels" .= (length.edges) n 
-                        , "capacity" .=  sum (map sats $ edges n)
+                        , "channels" .= (length.edges') n 
+                        , "capacity" .=  sum (map sats $ edges' n)
                         , "paths to:" .= crumbs n 
                         ]) i
                 "stormdeploy" -> rc
                 "stormrebalance" -> rc
                 -- V2
                 "v2stormload" -> do
-                    liftIO $ log'' "why would it rc??"
                     handle <- liftIO $ readIORef ioref 
                     gra <- liftIO $ loadGraph handle 
                     lift $ yield $ Res (object [
-                                          "nodes" .= order gra 
-                                        , "edges" .= size gra 
-                                        ]) i
+                          "nodes" .= order gra 
+                        , "edges" .= size gra 
+                        ]) i
                 "v2stormsize" -> do 
-                    rc
-                "v2stormcircle" -> do 
-                    handle <- liftIO $ readIORef ioref
-                    cir <- liftIO $ findCircles.fst.head $ readHex "0353f8989329d9abf1030046dcea78c3d6e6297f18297e75c57dfde6f9b587515f" 
-                    lift $ yield $ Res (msg $ pack $ show $ length cir) i 
+                    gra <- liftIO $ readIORef graphRef
+                    -- this needs to be updated to use multithread
+                    lift $ yield $ Res (object [
+                          "nodes" .= order gra 
+                        , "edges" .= size gra 
+                        , "isConnected" .= isConnected gra 
+                        , "components" .= map length (components gra)
+                        , "capacity" .= (foldr (\e t -> (collat.sel3) e + t) 0 
+                            $ nubBy (\e e' -> (short.sel3) e == (short.sel3) e') (labEdges gra))
+                        ]) i
+                    where sel3 (_,_,e) = e 
+                "v2stormnode" -> do 
+                    gra <- liftIO $ readIORef graphRef
+                    lol <- pure $ (fst.head.readHex $ (filter ((/=) '\"') (show $ frip p)))
+                    lift $ yield $ Res (object [
+                          "levels" .= show (foldr countNode [] $ level lol gra) 
+                        , "reachable" .= length $ reachable lol gra
+                        ]) i 
+                    where 
+                        countNode (_, d) c = case (lookup d c) of 
+                            (Just b) -> (d, b + 1) : (filter (\(x, _) -> x /= d) c)
+                            Nothing -> (d, 1) : c
+
+                "v2stormcircle" -> rc 
+                    
                 -- BCLI OVERIDE (not enabled) - via electrum?
                 "getchaininfo" -> rc
                 "estimatefees" -> rc
@@ -163,7 +184,6 @@ b = evalStateT l Nothing
                 "getutxout" -> rc
                 "sendrawtransaction" -> rc
                 otherwise ->  do 
-                    liftIO $ log'' $ "anot caught correctly" <> (show m) 
                     rc
     monad _ = pure ()
 
@@ -179,5 +199,3 @@ green = object [ "result" .= ("continue"::Text) ]
 msg x = object ["sigh" .= x] 
 tail' [] = [] 
 tail' x = tail x 
-t' = "/home/taylor/Projects/storm/t.log"
-log'' msg = System.IO.appendFile t' msg 

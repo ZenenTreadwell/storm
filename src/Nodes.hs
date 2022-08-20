@@ -38,7 +38,7 @@ type ShortId = String
 em = Node "" [] [] Nothing -- remove 
 data Node = Node {
       nodeId :: NodeId
-    , edges :: [Edge] 
+    , edges' :: [Edge] 
     , crumbs :: [Crumb]
     , peer :: Maybe Peer
     } deriving (Show)    
@@ -111,7 +111,7 @@ genPath p n c
         Just n' -> genPath ((nodeId n):p) n' (nextC n') 
         Nothing -> pure p 
     where 
-        ex = filter ((/= (arrow c)).shortId) $ edges n 
+        ex = filter ((/= (arrow c)).shortId) $ edges' n 
         nextC n'' = head $ filter (((==) (hops c - 1) ).hops) $  crumbs n''
  
 
@@ -195,6 +195,3 @@ toNode (ListChannels []) = em
 toEdge :: Channel -> Edge 
 toEdge c = Edge (destination c) (short_channel_id c) (satoshis c) (
     Fee (base_fee_millisatoshi c) (fee_per_millionth c) ) 
-
-t = "/home/taylor/Projects/storm/t.log"
-log' msg = System.IO.appendFile t msg 

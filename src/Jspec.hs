@@ -8,6 +8,7 @@
     RankNTypes
  #-}
 
+-- prior art https://hackage.haskell.org/package/jsonrpc-conduit-0.2.5
 module Jspec where 
 
 import GHC.Generics
@@ -22,7 +23,6 @@ import qualified Data.ByteString as S
 import Data.Conduit 
 import Data.Attoparsec.ByteString
 
--- prior art https://hackage.haskell.org/package/jsonrpc-conduit-0.2.5
 jinjin :: (FromJSON a) => ConduitT S.ByteString (Fin a) IO ()
 jinjin = evalStateT l Nothing
     where 

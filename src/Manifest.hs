@@ -17,6 +17,7 @@ manifest = object [
           RpcMethod "v2stormload" "" "Loads map into memory as graph" Nothing False  
         , RpcMethod "v2stormsize" "" "Return info about nodes stored in memory" Nothing False
         , RpcMethod "v2stormcircle" "" "Return all circular routes by size (ie triangle, square, ..)" Nothing False
+        , RpcMethod "v2stormnode" "[nodeid]" "Show info storm has on node." Nothing False
         -- these will be deprecated / loads via bfs / graph via pointers to map Nodes.hs
         , RpcMethod "stormload" "" "Loads map into memory" Nothing False  
         , RpcMethod "stormcircle" "" "Return all circular routes by size (ie triangle, square, ..)" Nothing False
