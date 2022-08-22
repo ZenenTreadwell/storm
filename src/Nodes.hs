@@ -195,3 +195,4 @@ toNode (ListChannels []) = em
 toEdge :: Channel -> Edge 
 toEdge c = Edge (destination c) (short_channel_id c) (satoshis c) (
     Fee (base_fee_millisatoshi c) (fee_per_millionth c) ) 
+

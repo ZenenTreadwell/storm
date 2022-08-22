@@ -9,28 +9,24 @@ import GHC.Generics
 import Data.Text (Text) 
 import Data.Aeson 
 
+
 manifest :: Value
 manifest = object [
     "options" .= ([]::[Option]), 
     "rpcmethods" .= ([
-        -- all channels into fgl Graph.hs
-          RpcMethod "v2stormload" "" "Loads map into memory as graph" Nothing False  
-        , RpcMethod "v2stormsize" "" "Return info about nodes stored in memory" Nothing False
-        , RpcMethod "v2stormcircle" "" "Return all circular routes by size (ie triangle, square, ..)" Nothing False
-        , RpcMethod "v2stormnode" "[nodeid]" "Show info storm has on node." Nothing False
-        -- these will be deprecated / loads via bfs / graph via pointers to map Nodes.hs
-        , RpcMethod "stormload" "" "Loads map into memory" Nothing False  
-        , RpcMethod "stormcircle" "" "Return all circular routes by size (ie triangle, square, ..)" Nothing False
+          RpcMethod "stormload" "" "Loads graph into memory" Nothing False  
+        --, RpcMethod "stormcircle" "" "Return all circular routes by size (ie triangle, square, ..)" Nothing False
         , RpcMethod "stormsize" "" "Return info about nodes stored in memory" Nothing False  
-        , RpcMethod "stormcandidates" "" "Return list of far away nodeid." Nothing False 
+        , RpcMethod "stormcomponents" "" "Return graphs components (segment unreachable)" Nothing False  
+        --, RpcMethod "stormcandidates" "" "Return list of far away nodeid." Nothing False 
         , RpcMethod "stormnode" "[nodeid]" "Show info storm has on node." Nothing False 
-        -- todo - hold invoice functionality 
+        -- hold invoice functionality 
         , RpcMethod "storminvoice" "[amt]" "Return an invoive that will be held." Nothing False
         , RpcMethod "stormaccept" "[invoice]" "" Nothing False 
         , RpcMethod "stormrefuse" "[invoice]" "" Nothing False 
         -- todo - fund management functionality
-        , RpcMethod "stormdeploy" "" "Divide available between candidates & batch open" Nothing False 
-        , RpcMethod "stormrebalance" "[node1,node2]" "Try keysend between channels" Nothing False 
+        --, RpcMethod "stormdeploy" "" "Divide available between candidates & batch open" Nothing False 
+        --, RpcMethod "stormrebalance" "[node1,node2]" "Try keysend between channels" Nothing False 
     ]), 
     "hooks" .= ([
           Hook "invoice_payment" Nothing 

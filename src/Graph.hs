@@ -1,7 +1,8 @@
 {-# LANGUAGE 
     DuplicateRecordFields, 
     LambdaCase, 
-    DeriveGeneric
+    DeriveGeneric, 
+    OverloadedStrings
 #-}
 
 module Graph where 
@@ -30,15 +31,21 @@ import GHC.Real
 
 import Data.List
 import Data.Maybe 
+import Data.Char
+
+type Gra = Gr Node' Edge'
 
 --- XXX
-graphRef :: IORef (Gr Node' Edge')
+graphRef :: IORef (Gra)
 graphRef = unsafePerformIO $ newIORef empty 
 {-# NOINLINE graphRef #-}
 
 data Node' = N {
-      alias' :: Maybe String
-    , crumb :: Maybe Crumb }
+      pubkey :: Maybe String
+    , alias' :: Maybe String
+    , crumb :: Maybe [Crumb] }
+em = N Nothing Nothing Nothing
+
 
 data Edge' = E { 
       short :: String 
@@ -46,12 +53,13 @@ data Edge' = E {
     , fees :: Fee   
     , mysat :: Maybe Sat 
     , htlcs :: Maybe [Int] }
-    -- home :: Node 
+    deriving (Generic, Show, Eq)
+instance ToJSON Edge' 
 
 toEdge' :: Channel -> LEdge Edge' 
 toEdge' c = (
-    (fst.head $ readHex $ source c),
-    (fst.head $ readHex $ destination c),
+    (getNodeInt $ source c), 
+    (getNodeInt $ destination c),
     (E  
         (short_channel_id c) 
         (satoshis c) 
@@ -61,104 +69,71 @@ toEdge' c = (
     )) 
     
 toNode' :: NodeInfo -> LNode Node'
-toNode' n = ((fst.head $ readHex $ nodeid n), N (ali n) Nothing)
+toNode' n = ((getNodeInt $ nodeid n), N (Just $ nodeid n) (ali n) Nothing )
     where ali = alias :: NodeInfo -> Maybe String
 
+-- overflows to negative, but think fine, still uniq 
+getNodeInt :: String -> Node
+getNodeInt = fst.head.readHex.filter isHexDigit 
+
+loadGraph :: Handle -> IO (Gra)
 loadGraph h = (allchannels h) >>= \case 
     (Just (Correct (Res a' _))) -> do 
-        gra <- pure $ mkGraph (nodesFromChannels a'') (map toEdge' a'')
+        gra <- pure $ foldr insertEdge empty a''
         liftIO $ writeIORef graphRef $ gra
         pure gra
-        where a'' :: [Channel]
-              a'' = channels a'
-              nodesFromChannels :: [Channel] -> [LNode Node']
-              nodesFromChannels cx = foldr allnodr [] cx
-              allnodr :: Channel -> [LNode Node'] -> [LNode Node']
-              allnodr c nx = (fst.head $ readHex $ destination c, N Nothing Nothing) 
-                             : (fst.head $ readHex $ source c, N Nothing Nothing) 
-                             : nx
+        where
+              insertEdge :: LEdge Edge' -> Gra -> Gra  
+              insertEdge e@(x,y,z) b = case (gelem y b, gelem x b) of 
+                  (True, True) -> insEdge e b
+                  (False, True) -> insEdge e (insertEmpty y b)
+                  (True, False) -> insEdge e (insertEmpty x b) 
+                  (False, False) -> insEdge e (insertEmpty x (insertEmpty y b))  
+                
+              insertEmpty :: Node -> Gra -> Gra 
+              insertEmpty n g = insNode (n, em) g
+              a'' = map toEdge' $ channels a'
     otherwise -> pure empty  
 
+findPaths :: Node -> Node -> IO [Crumb]
+findPaths n v = do 
+    gra <- readIORef graphRef 
+    case match n gra of 
+        (Just c, gra') -> do 
+            pure $ map (findPath gra' v) $ out' c
+        (Nothing, _) -> pure []   
+    where   
+        findPath :: Gra -> Node -> LEdge Edge' -> Crumb 
+        findPath g v' (_, n', e) = foldr crumpdate (initCrumb e) $ crymore g $ esp n' v' g 
+        crymore :: Gra -> Path -> [Edge'] 
+        crymore _ [] = []
+        crymore _ (x:[]) = []
+        crymore g (x:y:xyz) = lookupEdge g (x, y) : (crymore g xyz) 
+        lookupEdge :: Gra -> Edge -> Edge' 
+        lookupEdge g e = snd $ head $ filter (\s -> fst s == snd e) $ lsuc' $ context g (fst e)  
 
-
-
-
-findCircles n = do 
-    g <- readIORef graphRef
-    pure (bft n g)
-
-
-
-
-
-
--- findCircles' n g = xdffWith cFac [n] g 
---cFac (incoming, n', _, outgoing) = undefined 
-
-
--- dfs? wth is taking so long? -- nothing prevents researching e
---findCircles :: Node -> IO [Crumb]
---findCircles n = do
---    g <- readIORef graphRef
---    pure $ gogo g [homeCrumb n] [] 
---    where
---        gogo :: Gr Node' Edge' -> [ Crumb ] -> [ Crumb ] -> [ Crumb ]
---        gogo g [] fin = fin 
---        gogo g (x:xs) fin 
---            | (length.path) x > 5 = gogo g xs fin
---            | (last.path) x == (head.path) x && (length.path) x > 1 = gogo g xs (x:fin) 
---            | otherwise = gogo g ( (++) xtsd xs) fin 
---            where 
---                (incoming, n', _, outgoing) = context g ((head.path) x) 
---                xtsd :: [Crumb] 
---                xtsd = catMaybes $ map (crumpdate x) (nubBy unuq outgoing)
---                unuq (_, n1) (_, n2) = n1 == n2 
-
--- use shortest path tree?
---findCircles n = (readIORef graphRef) >>= \g ->  
---    let tree = spTree n (emap fff g)
---    in pure $ ufold ff [] g  
---    where -- .. ff :: Context Node' Edge' -> [LPath]
---        
---        ff = undefined
---        fff :: Edge' -> Integer 
---        fff e = toInteger (collat e)     
-    
--- Use label on node to never revisit (same solution as Nodes) 
--- whole point of fgl was inductive def = avoid node marking 
---findCircles n = do 
---    g <- readIORef graphRef -- xxx
---    pure $ gogo g (C 0 mempty maxBound []) (context g n)    
---    where
---        gogo g cr c@(_, i, _, outgoing)
---                | i == n = crumbs cr  
---                | hops cr > 20 = []    
---                | otherwise =  pure $ join $ map (ff g) outgoing
---                where 
---                    ff g le@(e, n2) = gogo g (crumpdate cr i le) (context g n2)
---
 data Crumb = C {
-      hops :: Int 
-    , totalfees :: Fee 
-    , neck :: Sat 
-    , path :: Path  
-    } deriving (Show, Generic) 
-instance ToJSON Crumb
+      hops :: Int
+    , cost :: Fee 
+    , neck :: Sat   
+    , arrow :: [Edge']
+    } deriving (Generic, Show, Eq) 
+instance ToJSON Crumb where 
+    toJSON cr = object [
+          "hops" .= hops cr 
+        , "totalfee" .= cost cr
+        , "maximum" .= neck cr ]
 
-homeCrumb n = C 0 (Fee 0 0) maxBound [n] 
+initCrumb :: Edge' -> Crumb 
+initCrumb e = C (1) (fees e) (collat e) (e : [])
 
-crumpdate :: Crumb -> (Edge', Node) -> Maybe Crumb 
-crumpdate cr (e, n2) = 
-    case elemIndex n2 p of
-        Just ind -> if ( ind == (length p) - 1 )   
-            then ud 
-            else Nothing -- no loop for you 
-        Nothing -> ud
-     where 
-        p = path cr
-        ud = Just $ C 
-            (hops cr + 1) 
-            (Fee ((base.totalfees) cr + (base.fees) e) 0) -- ppm xxx 
-            (min (neck cr) (collat e))
-            (n2 : p)
+crumpdate :: Edge' -> Crumb -> Crumb 
+crumpdate e cr = C 
+    (hops cr + 1) 
+    (Fee 
+        ((base.cost) cr + (base.fees) e) 
+        ((((ppm.cost) cr) + ((ppm.fees) e)) `div` 2)) -- not accurate overweights newest
+    (min (neck cr) (collat e))
+    (e : (arrow cr))
+
 

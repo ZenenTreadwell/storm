@@ -85,7 +85,6 @@ data Payment = Payment {
     , amount_msat :: Int } deriving (Show, Generic) 
 instance FromJSON Payment
 
-
 --RPC data
 data Invoice = Invoice {
           payment_hash :: String
