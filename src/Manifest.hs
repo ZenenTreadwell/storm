@@ -17,9 +17,11 @@ manifest = object [
           RpcMethod "stormload" "" "Loads graph into memory" Nothing False  
         --, RpcMethod "stormcircle" "" "Return all circular routes by size (ie triangle, square, ..)" Nothing False
         , RpcMethod "stormsize" "" "Return info about nodes stored in memory" Nothing False  
-        , RpcMethod "stormcomponents" "" "Return graphs components (segment unreachable)" Nothing False  
+        , RpcMethod "stormcomponents" "" "Return graphs components (segments)" Nothing False  
+        , RpcMethod "stormnode" "[nodeid]" "Load node data." Nothing False 
+        , RpcMethod "stormpaths" "[n1, n2]" "Show fee info about paths between two nodes." Nothing False 
+        , RpcMethod "stormwallet" "" "Show wallet totals." Nothing False 
         --, RpcMethod "stormcandidates" "" "Return list of far away nodeid." Nothing False 
-        , RpcMethod "stormnode" "[nodeid]" "Show info storm has on node." Nothing False 
         -- hold invoice functionality 
         , RpcMethod "storminvoice" "[amt]" "Return an invoive that will be held." Nothing False
         , RpcMethod "stormaccept" "[invoice]" "" Nothing False 

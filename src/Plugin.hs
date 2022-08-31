@@ -1,6 +1,7 @@
 {-# LANGUAGE 
       LambdaCase
     , OverloadedStrings 
+    , DuplicateRecordFields
 #-}
 module Plugin where 
 
@@ -41,6 +42,8 @@ type Method = Text
 type Params = Value
 type Id = Value
 
+log' t = System.IO.appendFile "/home/o/Desktop/stormlog" t
+
 ioref :: IORef (Handle) 
 ioref = unsafePerformIO $ newIORef stderr
 {-# NOINLINE ioref #-} 
@@ -69,7 +72,9 @@ b = evalStateT l Nothing
             "forward_event"          -> pure ()    
             "sendpay_success"        -> pure ()    
             "sendpay_failure"        -> pure ()    
-            "coin_movement"          -> pure ()    
+            "coin_movement"          -> case ((fromJSON p) :: Result CoinMovement ) of 
+                Success (a)             -> pure () --liftIO $ log' $ (show a) <> "\n"
+                Error x                 -> pure ()                       
             "balance_snapshot"       -> pure ()
             "openchannel_peer_sigs"  -> pure ()    
             "shutdown"               -> pure ()    
@@ -109,13 +114,14 @@ b = evalStateT l Nothing
                 lift $ yield $ Res (object [
                       "nodes" .= order gra 
                     , "edges" .= size gra 
-                    , "capacity" .= ufold (\c c' -> c' + (sum $ map (\(_,e) -> collat e) $ (lpre' c)) ) 0 gra  
+                    , "capacity" .= calcCapacity gra 0 
                     ]) i
                 where sel3 (_,_,e) = e 
             "stormcomponents" -> do 
                 gra <- liftIO $ readIORef graphRef
                 lift $ yield $ Res (object [ "components" .= map length (components gra)]) i
-            "stormnode" -> do 
+            "stormnode" -> rc
+            "stormpaths" -> do 
                 gra <- liftIO $ readIORef graphRef
                 paths <- liftIO $ findPaths x y  
                 lift $ yield $ Res (object [
@@ -128,9 +134,26 @@ b = evalStateT l Nothing
                     countNode (_, d) c = case (lookup d c) of 
                         (Just b) -> (d, b + 1) : (filter (\(x, _) -> x /= d) c)
                         Nothing -> (d, 1) : c
-            "stormcircle" -> rc 
-                
-            -- BCLI ---- via electrum servers? light client  
+            "stormwallet" -> do 
+                handle <- liftIO $ readIORef ioref 
+                fun <- liftIO $ listFunds handle 
+                case fun of 
+                    (Just (Correct (Res fun' _))) -> 
+                        lift $ yield $ Res (summarizeFunds fun') i   
+                    _ -> rc 
+                where 
+                    --summarizeFunds :: ListFunds -> Text
+                    summarizeFunds j = object [
+                          "onChain" .= ((`div` 1000) $ sum  $ map ((read :: String -> Int) . (takeWhile isDigit) . (amount_msat :: LFOutput -> String)) (outputs j))
+                        , "inChannel" .= (foldr channelBreakdown [] $ ((channels :: ListFunds -> [LFChannel]) j))  
+                        ]                
+                        where channelBreakdown :: LFChannel -> [(String, Int)] -> [(String, Int)] 
+                              channelBreakdown x a = case lookup (__state x) a of 
+                                  Just cur -> (__state  x, cur + readAmount x) : (filter ((/= (__state x)).fst) a)  
+                                  Nothing -> (__state  x, readAmount x) : a
+                              readAmount = ((read :: String -> Int) . (takeWhile isDigit) . (our_amount_msat :: LFChannel -> String))
+
+            -- BCLI --   
             "getchaininfo" -> rc
             "estimatefees" -> rc
             "getrawblockbyheight" -> rc
@@ -150,5 +173,3 @@ c = await >>= maybe mempty (\v -> yield $ L.toStrict $ encode v)
 
 green = object [ "result" .= ("continue"::Text) ]
 msg x = object ["sigh" .= x] 
-tail' [] = [] 
-tail' x = tail x 

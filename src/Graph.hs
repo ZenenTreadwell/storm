@@ -5,6 +5,7 @@
     OverloadedStrings
 #-}
 
+
 module Graph where 
 
 import Numeric 
@@ -72,7 +73,6 @@ toNode' :: NodeInfo -> LNode Node'
 toNode' n = ((getNodeInt $ nodeid n), N (Just $ nodeid n) (ali n) Nothing )
     where ali = alias :: NodeInfo -> Maybe String
 
--- overflows to negative, but think fine, still uniq 
 getNodeInt :: String -> Node
 getNodeInt = fst.head.readHex.filter isHexDigit 
 
@@ -89,10 +89,9 @@ loadGraph h = (allchannels h) >>= \case
                   (False, True) -> insEdge e (insertEmpty y b)
                   (True, False) -> insEdge e (insertEmpty x b) 
                   (False, False) -> insEdge e (insertEmpty x (insertEmpty y b))  
-                
               insertEmpty :: Node -> Gra -> Gra 
               insertEmpty n g = insNode (n, em) g
-              a'' = map toEdge' $ channels a'
+              a'' = map toEdge' $ (channels :: ListChannels -> [Channel] ) a'
     otherwise -> pure empty  
 
 findPaths :: Node -> Node -> IO [Crumb]
@@ -104,14 +103,22 @@ findPaths n v = do
         (Nothing, _) -> pure []   
     where   
         findPath :: Gra -> Node -> LEdge Edge' -> Crumb 
-        findPath g v' (_, n', e) = foldr crumpdate (initCrumb e) $ crymore g $ esp n' v' g 
-        crymore :: Gra -> Path -> [Edge'] 
-        crymore _ [] = []
-        crymore _ (x:[]) = []
-        crymore g (x:y:xyz) = lookupEdge g (x, y) : (crymore g xyz) 
+        findPath g v' (_, n', e) = foldr crumpdate (initCrumb e) $ ero g $ esp n' v' g 
+        ero :: Gra -> Path -> [Edge'] 
+        ero _ [] = []
+        ero _ (x:[]) = []
+        ero g (x:y:xyz) = lookupEdge g (x, y) : (ero g xyz) 
         lookupEdge :: Gra -> Edge -> Edge' 
         lookupEdge g e = snd $ head $ filter (\s -> fst s == snd e) $ lsuc' $ context g (fst e)  
 
+calcCapacity :: Gra -> Sat -> Sat
+calcCapacity g a 
+    | isEmpty g = a 
+    | otherwise = case matchAny g of 
+        (c, g') -> calcCapacity g' $ a + (sum $ map (collat.fst) 
+                                              $ nubBy (\a b -> (short.fst) a == (short.fst) b) 
+                                              $ lneighbors' c) 
+     
 data Crumb = C {
       hops :: Int
     , cost :: Fee 

@@ -61,11 +61,11 @@ data Movement = Movement {
     , vout :: Maybe Int 
     , part_id :: Maybe Int 
     , payment_hash :: Maybe String 
-    , credit_msat :: Int
-    , debit_msat :: Int
+    , credit :: Maybe String
+    , debit :: Maybe String
     , output_msat :: Maybe Int
     , output_count :: Maybe Int 
-    , fees_msat :: Maybe Int 
+    , __fees :: Maybe String
     , tags :: [String]
     , blockheight :: Maybe Int 
     , timestamp :: Int 
@@ -153,5 +153,37 @@ data NodeInfo = NodeInfo {
     } deriving (Generic, Show) 
 instance FromJSON NodeInfo
 instance ToJSON NodeInfo
-
 --data Addr = Addr {
+
+
+data ListFunds = ListFunds {
+      outputs :: [LFOutput]
+    , channels :: [LFChannel]     
+    } deriving (Show, Generic) 
+instance FromJSON ListFunds
+instance ToJSON ListFunds
+data LFOutput = LFOutput {
+      amount_msat :: String 
+    , status :: String 
+    } deriving (Show, Generic)  
+instance FromJSON LFOutput
+instance ToJSON LFOutput
+
+data LFChannel = LFChannel {
+      amount_msat :: String 
+    , our_amount_msat :: String  
+    , __state :: String
+    } deriving (Show, Generic) 
+instance FromJSON LFChannel where 
+    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
+instance ToJSON LFChannel 
+
+
+
+
+
+
+
+
+
+

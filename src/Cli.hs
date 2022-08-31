@@ -24,17 +24,27 @@ import Control.Monad.IO.Class as O
 import qualified Control.Monad.Reader as R 
 import Control.Monad.Trans 
 import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State 
 
 import Data.Aeson 
 import Network.Socket 
-import Network.Socket.ByteString (send, recv) 
 
 import Data.Conduit hiding (connect) 
-import Data.Conduit.Combinators hiding (stdout) 
+import Data.Conduit.Combinators hiding (stdout, stderr, stdin) 
 
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Text
+
+fromInit v = case fromJSON v of 
+    Success (InitConfig f g) -> f <> "/" <> g 
+    otherwise -> "" 
+
+connectSocket descriptor = (socket AF_UNIX Stream 0) >>= \soc -> do 
+    connect soc $ SockAddrUnix descriptor
+    h <- socketToHandle soc ReadWriteMode
+    pure h 
+
 
 getinfo h = do 
     reqToHandle h $ Req ("getinfo"::Text) (object []) (Just (Number 3))  
@@ -62,14 +72,17 @@ allnodes h = do
                .| (jinjin :: (ConduitT S.ByteString (Fin (Res ListNodes)) IO () ))
                .| (await >>= pure)  
  
-fromInit v = case fromJSON v of 
-    Success (InitConfig f g) -> f <> "/" <> g 
-    otherwise -> "" 
 
-connectSocket descriptor = (socket AF_UNIX Stream 0) >>= \soc -> do 
-    connect soc $ SockAddrUnix descriptor
-    h <- socketToHandle soc ReadWriteMode
-    pure h 
+
+listFunds h = do 
+    reqToHandle h $ Req ("listfunds"::Text) (object []) (Just $ Number 88) 
+    runConduit $ sourceHandle h 
+               .| (jinjin :: (ConduitT S.ByteString (Fin (Res ListFunds)) IO () ))
+               .| (await >>= pure)  
+    
+
+
+
 
 data InitConfig = InitConfig String String deriving (Generic) 
 instance FromJSON InitConfig where 

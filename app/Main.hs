@@ -1,15 +1,15 @@
 module Main where
-import Jspec
-import Plugin
+import Jspec (jinjin)
+import Plugin (plug)
 import Control.Monad (forever)
 import System.IO
 import Data.Conduit.Combinators (sourceHandle, sinkHandle)
-import Data.Conduit 
+import Data.Conduit
 main :: IO ()
-main = do 
+main = do
     hSetBuffering stdin NoBuffering
     hSetBuffering stdout NoBuffering
-    forever $ runConduit $ sourceHandle stdin 
-           .| jinjin 
-           .| plug 
+    forever $ runConduit $ sourceHandle stdin
+           .| jinjin
+           .| plug
            .| sinkHandle stdout
