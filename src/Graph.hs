@@ -5,7 +5,6 @@
     OverloadedStrings
 #-}
 
-
 module Graph where 
 
 import Numeric 
@@ -36,7 +35,7 @@ import Data.Char
 
 type Gra = Gr Node' Edge'
 
---- XXX
+--- XEvery time you use unsafePerformIO, a kitten dies.X
 graphRef :: IORef (Gra)
 graphRef = unsafePerformIO $ newIORef empty 
 {-# NOINLINE graphRef #-}
@@ -73,11 +72,21 @@ toNode' :: NodeInfo -> LNode Node'
 toNode' n = ((getNodeInt $ nodeid n), N (Just $ nodeid n) (ali n) Nothing )
     where ali = alias :: NodeInfo -> Maybe String
 
+
+
+findLargest gra = ufold islargest (0, 0) gra 
+
+islargest nc c = if (length.suc') nc > fst c then ( (length.suc') nc , node' nc )  
+                                             else c 
+
+
+segponants gra stop = undefined
+
 getNodeInt :: String -> Node
 getNodeInt = fst.head.readHex.filter isHexDigit 
 
-loadGraph :: Handle -> IO (Gra)
-loadGraph h = (allchannels h) >>= \case 
+loadGraph :: IO (Gra)
+loadGraph = (allchannels) >>= \case 
     (Just (Correct (Res a' _))) -> do 
         gra <- pure $ foldr insertEdge empty a''
         liftIO $ writeIORef graphRef $ gra
@@ -94,7 +103,12 @@ loadGraph h = (allchannels h) >>= \case
               a'' = map toEdge' $ (channels :: ListChannels -> [Channel] ) a'
     otherwise -> pure empty  
 
+
+findCircles :: Node -> IO [Crumb]
+findCircles = undefined 
+
 findPaths :: Node -> Node -> IO [Crumb]
+findPaths n v | n == v = findCircles n 
 findPaths n v = do 
     gra <- readIORef graphRef 
     case match n gra of 
@@ -118,6 +132,8 @@ calcCapacity g a
         (c, g') -> calcCapacity g' $ a + (sum $ map (collat.fst) 
                                               $ nubBy (\a b -> (short.fst) a == (short.fst) b) 
                                               $ lneighbors' c) 
+
+
      
 data Crumb = C {
       hops :: Int

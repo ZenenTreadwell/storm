@@ -9,7 +9,6 @@ import GHC.Generics
 import Data.Text (Text) 
 import Data.Aeson 
 
-
 manifest :: Value
 manifest = object [
     "options" .= ([]::[Option]), 

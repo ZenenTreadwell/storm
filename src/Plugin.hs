@@ -42,12 +42,6 @@ type Method = Text
 type Params = Value
 type Id = Value
 
-log' t = System.IO.appendFile "/home/o/Desktop/stormlog" t
-
-ioref :: IORef (Handle) 
-ioref = unsafePerformIO $ newIORef stderr
-{-# NOINLINE ioref #-} 
-
 a :: (Monad n) => ConduitT (Fin (Req Value)) (Either (Res Value) (Maybe Id, Method, Params))  n () 
 a = await >>= maybe mempty (\case  
     Correct v -> yield $ Right (getReqId v, getMethod v, getParams v) 
@@ -73,7 +67,7 @@ b = evalStateT l Nothing
             "sendpay_success"        -> pure ()    
             "sendpay_failure"        -> pure ()    
             "coin_movement"          -> case ((fromJSON p) :: Result CoinMovement ) of 
-                Success (a)             -> pure () --liftIO $ log' $ (show a) <> "\n"
+                Success (a)             -> pure () 
                 Error x                 -> pure ()                       
             "balance_snapshot"       -> pure ()
             "openchannel_peer_sigs"  -> pure ()    
@@ -84,8 +78,7 @@ b = evalStateT l Nothing
         in case m of
             -- INITIALIZATION 
             "init" -> do 
-                h <- liftIO $ connectSocket (fromInit p)
-                liftIO $ writeIORef ioref h 
+                liftIO $ connectSocket (fromInit p)
                 rc 
             "getmanifest" -> lift $ yield $ Res manifest i
             -- HOOK
@@ -103,8 +96,7 @@ b = evalStateT l Nothing
             "onion_message_ourpath" -> rc 
             -- STORM 
             "stormload" -> do 
-                handle <- liftIO $ readIORef ioref 
-                gra <- liftIO $ loadGraph handle 
+                gra <- liftIO $ loadGraph 
                 lift $ yield $ Res (object [
                       "nodes" .= order gra 
                     , "edges" .= size gra 
@@ -135,8 +127,7 @@ b = evalStateT l Nothing
                         (Just b) -> (d, b + 1) : (filter (\(x, _) -> x /= d) c)
                         Nothing -> (d, 1) : c
             "stormwallet" -> do 
-                handle <- liftIO $ readIORef ioref 
-                fun <- liftIO $ listFunds handle 
+                fun <- liftIO $ listFunds  
                 case fun of 
                     (Just (Correct (Res fun' _))) -> 
                         lift $ yield $ Res (summarizeFunds fun') i   
