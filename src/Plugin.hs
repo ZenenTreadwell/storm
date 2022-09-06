@@ -35,12 +35,12 @@ import Data.Foldable
 import Data.List 
 import Data.Char 
 
-plug :: ConduitT (Fin (Req Value)) S.ByteString IO () 
-plug = a .| b .| c 
-
 type Method = Text 
 type Params = Value
 type Id = Value
+
+plug :: ConduitT (Fin (Req Value)) S.ByteString IO () 
+plug = a .| b .| c 
 
 a :: (Monad n) => ConduitT (Fin (Req Value)) (Either (Res Value) (Maybe Id, Method, Params))  n () 
 a = await >>= maybe mempty (\case  
@@ -53,114 +53,111 @@ b = evalStateT l Nothing
     where 
     l = lift await >>= monad 
     monad (Just( (Left r))) = lift $ yield r  
-    monad (Just (Right (Nothing, m, p) )) = do 
-        -- NOTIFICATION 
-        case m of 
-            "channel_opened"         -> pure ()    
-            "channel_state_changed"  -> pure ()    
-            "connect"                -> pure ()     
-            "disconnect"             -> pure ()    
-            "invoice_payment"        -> pure ()    
-            "invoice_creation"       -> pure ()    
-            "warning"                -> pure ()    
-            "forward_event"          -> pure ()    
-            "sendpay_success"        -> pure ()    
-            "sendpay_failure"        -> pure ()    
-            "coin_movement"          -> case ((fromJSON p) :: Result CoinMovement ) of 
-                Success (a)             -> pure () 
-                Error x                 -> pure ()                       
-            "balance_snapshot"       -> pure ()
-            "openchannel_peer_sigs"  -> pure ()    
-            "shutdown"               -> pure ()    
-            otherwise                -> pure ()       
-    monad (Just (Right (Just i, m, p))) = 
-        let rc = lift $ yield $ Res green i 
-        in case m of
-            -- INITIALIZATION 
-            "init" -> do 
-                liftIO $ connectSocket (fromInit p)
-                rc 
-            "getmanifest" -> lift $ yield $ Res manifest i
-            -- HOOK
-            "peer_connected"        -> rc 
-            "commitment_revocation" -> rc
-            "invoice_payment"       -> rc 
-            "openchannel"           -> rc  
-            "openchannel2"          -> rc 
-            "openchannel2_changed"  -> rc 
-            "openchannel2_sign"     -> rc 
-            "rbf_channel"           -> rc 
-            "htlc_accepted"         -> rc 
-            "rpc_command"           -> rc  
-            "onion_message_blinded" -> rc 
-            "onion_message_ourpath" -> rc 
-            -- STORM 
-            "stormload" -> do 
-                gra <- liftIO $ loadGraph 
-                lift $ yield $ Res (object [
-                      "nodes" .= order gra 
-                    , "edges" .= size gra 
-                    ]) i
-            "stormsize" -> do 
-                gra <- liftIO $ readIORef graphRef
-                lift $ yield $ Res (object [
-                      "nodes" .= order gra 
-                    , "edges" .= size gra 
-                    , "capacity" .= calcCapacity gra 0 
-                    ]) i
-                where sel3 (_,_,e) = e 
-            "stormcomponents" -> do 
-                gra <- liftIO $ readIORef graphRef
-                lift $ yield $ Res (object [ "components" .= map length (components gra)]) i
-            "stormnode" -> rc
-            "stormpaths" -> do 
-                gra <- liftIO $ readIORef graphRef
-                paths <- liftIO $ findPaths x y  
-                lift $ yield $ Res (object [
-                      "levels" .= show (foldr countNode [] $ level x gra) 
-                    , "paypaths" .= show (map cost paths)     
-                    ]) i 
-                where 
-                    x = getNodeInt $ frip p 0
-                    y = getNodeInt $ frip p 1
-                    countNode (_, d) c = case (lookup d c) of 
-                        (Just b) -> (d, b + 1) : (filter (\(x, _) -> x /= d) c)
-                        Nothing -> (d, 1) : c
-            "stormwallet" -> do 
-                fun <- liftIO $ listFunds  
-                case fun of 
-                    (Just (Correct (Res fun' _))) -> 
-                        lift $ yield $ Res (summarizeFunds fun') i   
-                    _ -> rc 
-                where 
-                    --summarizeFunds :: ListFunds -> Text
-                    summarizeFunds j = object [
-                          "onChain" .= ((`div` 1000) $ sum  $ map ((read :: String -> Int) . (takeWhile isDigit) . (amount_msat :: LFOutput -> String)) (outputs j))
-                        , "inChannel" .= (foldr channelBreakdown [] $ ((channels :: ListFunds -> [LFChannel]) j))  
-                        ]                
-                        where channelBreakdown :: LFChannel -> [(String, Int)] -> [(String, Int)] 
-                              channelBreakdown x a = case lookup (__state x) a of 
-                                  Just cur -> (__state  x, cur + readAmount x) : (filter ((/= (__state x)).fst) a)  
-                                  Nothing -> (__state  x, readAmount x) : a
-                              readAmount = ((read :: String -> Int) . (takeWhile isDigit) . (our_amount_msat :: LFChannel -> String))
-
-            -- BCLI --   
-            "getchaininfo" -> rc
-            "estimatefees" -> rc
-            "getrawblockbyheight" -> rc
-            "getutxout" -> rc
-            "sendrawtransaction" -> rc
-            otherwise ->  do 
-                rc
+    monad (Just (Right (Nothing, m, p) )) = notifications m p
+    monad (Just (Right (Just i, m, p))) = hooks i m p
     monad _ = pure ()
 
-frip :: Value -> Int -> String 
-frip v i = case v ^? nth i . _String of
+c :: ConduitT (Res Value) S.ByteString IO () 
+c = await >>= maybe mempty (\v -> yield $ L.toStrict $ encode v) 
+
+notifications m p = case m of 
+    "channel_opened"         -> pure ()    
+    "channel_state_changed"  -> pure ()    
+    "connect"                -> pure ()     
+    "disconnect"             -> pure ()    
+    "invoice_payment"        -> pure ()    
+    "invoice_creation"       -> pure ()    
+    "warning"                -> pure ()    
+    "forward_event"          -> pure ()    
+    "sendpay_success"        -> pure ()    
+    "sendpay_failure"        -> pure ()    
+    "coin_movement"          -> case ((fromJSON p) :: Result CoinMovement ) of 
+        Success (a)             -> pure () 
+        Error x                 -> pure ()                       
+    "balance_snapshot"       -> pure ()
+    "openchannel_peer_sigs"  -> pure ()    
+    "shutdown"               -> pure ()    
+    otherwise                -> pure ()       
+
+hooks i m p = 
+  let rc = lift $ yield $ Res (object [ "result" .= ("continue"::Text) ]) i 
+  in case m of
+    "init" -> do 
+          liftIO $ connectCln $ fromInit p
+          rc 
+    "getmanifest" -> lift $ yield $ Res manifest i
+      
+      -- HOOK
+    "peer_connected"        -> rc 
+    "commitment_revocation" -> rc
+    "invoice_payment"       -> rc 
+    "openchannel"           -> rc  
+    "openchannel2"          -> rc 
+    "openchannel2_changed"  -> rc 
+    "openchannel2_sign"     -> rc 
+    "rbf_channel"           -> rc 
+    "htlc_accepted"         -> rc 
+    "rpc_command"           -> rc  
+    "onion_message_blinded" -> rc 
+    "onion_message_ourpath" -> rc 
+
+    -- BCLI   
+    "getchaininfo" -> rc
+    "estimatefees" -> rc
+    "getrawblockbyheight" -> rc
+    "getutxout" -> rc
+    "sendrawtransaction" -> rc
+
+    -- GRAPH 
+    "stormload" -> do 
+          liftIO $ loadGraph   
+          gra <- liftIO $ readIORef graphRef
+          lift $ yield $ Res (object [
+                "success" .= order gra 
+              ]) i
+    "stormsize" -> do 
+          gra <- liftIO $ readIORef graphRef
+          lift $ yield $ Res (object [
+                "nodes" .= order gra 
+              , "edges" .= size gra 
+              , "capacity" .= calcCapacity gra 0 
+              ]) i
+          where sel3 (_,_,e) = e 
+    "stormcomponents" -> do 
+          gra <- liftIO $ readIORef graphRef
+          lift $ yield $ Res (object [ "components" .= map length (components gra) ]) i
+    "stormnode" -> rc
+    "stormpaths" -> do 
+          gra <- liftIO $ readIORef graphRef
+          paths <- liftIO $ findPaths x y  
+          lift $ yield $ Res (object [
+                "levels" .= show (foldr countNode [] $ level x gra) 
+              , "paypaths" .= show (map cost paths)     
+              ]) i 
+          where 
+              x = getNodeInt $ getNodeArg 0 p
+              y = getNodeInt $ getNodeArg 1 p 
+              countNode (_, d) c = case (lookup d c) of 
+                  (Just b) -> (d, b + 1) : (filter (\(x, _) -> x /= d) c)
+                  Nothing -> (d, 1) : c
+    "stormwallet" -> do 
+          fun <- liftIO $ listFunds  
+          case fun of 
+              (Just (Correct (Res fun' _))) -> 
+                  lift $ yield $ Res (summarizeFunds fun') i   
+              _ -> rc 
+          where 
+              summarizeFunds j = object [
+                    "onChain" .= ((`div` 1000) $ sum  $ map ((read :: String -> Int) . (takeWhile isDigit) . (amount_msat :: LFOutput -> String)) (outputs j))
+                  , "inChannel" .= (foldr channelBreakdown [] $ ((channels :: ListFunds -> [LFChannel]) j))  
+                  ]                
+                  where channelBreakdown :: LFChannel -> [(String, Int)] -> [(String, Int)] 
+                        channelBreakdown x a = case lookup (__state x) a of 
+                            Just cur -> (__state  x, cur + readAmount x) : (filter ((/= (__state x)).fst) a)  
+                            Nothing -> (__state  x, readAmount x) : a
+                        readAmount = ((read :: String -> Int) . (takeWhile isDigit) . (our_amount_msat :: LFChannel -> String))
+    
+getNodeArg i v = case v ^? nth i . _String of
     (Just b) -> filter isHexDigit (show b) 
     Nothing -> ""
 
-c :: ConduitT (Res Value) S.ByteString IO () 
-c = await >>= maybe mempty (\v -> yield $ L.toStrict $ encode v)  
-
-green = object [ "result" .= ("continue"::Text) ]
-msg x = object ["sigh" .= x] 

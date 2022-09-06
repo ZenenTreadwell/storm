@@ -1,7 +1,7 @@
 {-# LANGUAGE
-    OverloadedStrings,
-    DuplicateRecordFields,
-    DeriveGeneric
+      OverloadedStrings
+    , DuplicateRecordFields
+    , DeriveGeneric
  #-}                 
 
 module Manifest (manifest) where 
@@ -22,15 +22,15 @@ manifest = object [
         , RpcMethod "stormwallet" "" "Show wallet totals." Nothing False 
         --, RpcMethod "stormcandidates" "" "Return list of far away nodeid." Nothing False 
         -- hold invoice functionality 
-        , RpcMethod "storminvoice" "[amt]" "Return an invoive that will be held." Nothing False
-        , RpcMethod "stormaccept" "[invoice]" "" Nothing False 
-        , RpcMethod "stormrefuse" "[invoice]" "" Nothing False 
+        --, RpcMethod "storminvoice" "[amt]" "Return an invoive that will be held." Nothing False
+        --, RpcMethod "stormaccept" "[invoice]" "" Nothing False 
+        --, RpcMethod "stormrefuse" "[invoice]" "" Nothing False 
         -- todo - fund management functionality
         --, RpcMethod "stormdeploy" "" "Divide available between candidates & batch open" Nothing False 
         --, RpcMethod "stormrebalance" "[node1,node2]" "Try keysend between channels" Nothing False 
     ]), 
     "hooks" .= ([
-          Hook "invoice_payment" Nothing 
+        --  Hook "invoice_payment" Nothing 
         --  Hook "peer_connected" Nothing
         --, Hook "openchannel" Nothing 
         --, Hook "htlc_accepted" Nothing 
@@ -98,4 +98,5 @@ data Notification = Notification {
   } deriving Generic
 instance ToJSON Notification where 
     toJSON = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')}
+
 

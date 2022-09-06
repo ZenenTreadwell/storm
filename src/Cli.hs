@@ -10,42 +10,41 @@ module Cli where
 
 import Jspec
 import Lightningd
-
 import System.IO
 import System.IO.Unsafe
 import GHC.IO.IOMode
 import GHC.IORef
 import GHC.Generics
-
 import Data.IORef
 import Data.ByteString      as S
 import Data.ByteString.Lazy as L 
-
 import Control.Monad 
+import Control.Monad.State
 import Control.Monad.IO.Class as O
-import qualified Control.Monad.Reader as R 
-import Control.Monad.Trans 
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.State 
-
 import Data.Aeson 
 import Network.Socket 
-
 import Data.Conduit hiding (connect) 
 import Data.Conduit.Combinators hiding (stdout, stderr, stdin) 
-
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Text
 
--- Every time you use unsafePerformIO, a kitten dies. :(
-clnref :: IORef (Handle) 
-clnref = unsafePerformIO $ newIORef stderr
-{-# NOINLINE clnref #-} 
+type Cln a = IO (Maybe (Fin (Res a)))
 
-connectSocket :: String -> IO ()
-connectSocket descriptor = (socket AF_UNIX Stream 0) >>= \soc -> do 
-    connect soc $ SockAddrUnix descriptor
+tick = do 
+    i <- readIORef idref
+    writeIORef idref (i + 1) 
+    pure $ toJSON i
+
+idref :: IORef Int
+idref = unsafePerformIO $ newIORef (1 :: Int) 
+
+clnref :: IORef Handle 
+clnref = unsafePerformIO $ newIORef stderr
+
+connectCln :: String -> IO ()
+connectCln d = (socket AF_UNIX Stream 0) >>= \soc -> do 
+    connect soc $ SockAddrUnix d
     h <- socketToHandle soc ReadWriteMode
     writeIORef clnref h
 
@@ -59,37 +58,46 @@ reqToHandle r = do
     h <- readIORef clnref 
     L.hPutStr h $ encode r 
 
-type Cln a = IO (Maybe (Fin (Res a)))
-
 getinfo :: Cln GetInfo 
 getinfo = do 
-    reqToHandle $ Req ("getinfo"::Text) (object []) (Just (Number 3))  
+    i <- tick 
+    reqToHandle $ Req ("getinfo"::Text) (object []) (Just $ i )  
     getRes 
-
--- todo: figure out iterating the req Id number
--- todo: figure out not passing handle explicitly ?
 
 channelsbysource :: String -> Cln ListChannels
 channelsbysource source = do 
+    i <- tick
     reqToHandle $ Req ("listchannels"::Text) (object [ 
         "source" .= source 
-        ]) (Just (Number 44))  
+        ]) (Just i)  
     getRes 
 
+getroute :: ToJSON a => a -> a -> a -> Cln GetRoute 
+getroute j m r = do
+    i <- tick 
+    reqToHandle $ Req ("getroute"::Text) (object [
+          "id" .= j 
+        , "msatoshi" .= m
+        , "riskfactor" .= r
+        ]) (Just i) 
+    getRes
 
 allchannels :: Cln ListChannels
 allchannels = do 
-    reqToHandle $ Req ("listchannels"::Text) (object []) (Just $ Number 33)     
+    i <- tick
+    reqToHandle $ Req ("listchannels"::Text) (object []) (Just $ i)     
     getRes 
 
 allnodes :: Cln ListNodes
 allnodes = do 
-    reqToHandle $ Req ("listnodes"::Text) (object []) (Just $ Number 55)     
+    i <- tick
+    reqToHandle $ Req ("listnodes"::Text) (object []) (Just $ i)     
     getRes 
 
 listFunds :: Cln ListFunds
 listFunds = do 
-    reqToHandle $ Req ("listfunds"::Text) (object []) (Just $ Number 88) 
+    i <- tick
+    reqToHandle $ Req ("listfunds"::Text) (object []) (Just $ i) 
     getRes 
 
 fromInit :: Value -> String

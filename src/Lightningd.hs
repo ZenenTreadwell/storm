@@ -11,22 +11,19 @@ import GHC.Generics
 import Data.Aeson
 import Data.Aeson.Types 
 
--- helps 
 type Sat = Int 
 type Msat = Int
-
 data Short = Short { 
       block :: Int
     , input  :: Int 
     , output :: Int
     } deriving (Show, Generic, Eq)
---instance ToJSON Short where 
-
 data Fee = Fee {
       base :: Int 
     , ppm :: Int 
     } deriving (Show, Generic, Eq)  
 instance ToJSON Fee
+
 --Subscription data
 data BalanceSnapshot = BalanceSnapshot { 
     balance_snapshots :: [Snapshot]
@@ -87,26 +84,26 @@ instance FromJSON Payment
 
 --RPC data
 data Invoice = Invoice {
-          payment_hash :: String
-        , expires_at :: Int
-        , bolt11 :: String
-        , payment_secret :: String 
+      payment_hash :: String
+    , expires_at :: Int
+    , bolt11 :: String
+    , payment_secret :: String 
     } deriving (Generic, Show)       
 instance FromJSON Invoice 
 
 data GetInfo = GetInfo {
-          __id :: String 
-        , alias :: String
-        , __color :: String 
-        , num_peers :: Int 
-        , num_pending_channels :: Int 
-        , lightning5dir  :: String
-        , num_active_channels :: Int
-        , num_inactive_channels :: Int
-        , blockheight :: Int
-        , network :: String
-        , msatoshi_fees_collected :: Int
-        } deriving (Generic, Show)
+      __id :: String 
+    , alias :: String
+    , __color :: String 
+    , num_peers :: Int 
+    , num_pending_channels :: Int 
+    , lightning5dir  :: String
+    , num_active_channels :: Int
+    , num_inactive_channels :: Int
+    , blockheight :: Int
+    , network :: String
+    , msatoshi_fees_collected :: Int
+    } deriving (Generic, Show)
 instance ToJSON GetInfo
 instance FromJSON GetInfo where
     parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = map repl . dropWhile (=='_')} v
@@ -137,9 +134,7 @@ instance FromJSON Channel where
     parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
 instance ToJSON Channel
 
-
-data ListNodes = ListNodes {
-    eNodes :: [NodeInfo]} deriving (Show, Generic)
+data ListNodes = ListNodes {eNodes :: [NodeInfo]} deriving (Show, Generic)
 instance ToJSON ListNodes 
 instance FromJSON ListNodes 
 
@@ -154,7 +149,6 @@ data NodeInfo = NodeInfo {
 instance FromJSON NodeInfo
 instance ToJSON NodeInfo
 --data Addr = Addr {
-
 
 data ListFunds = ListFunds {
       outputs :: [LFOutput]
@@ -178,12 +172,22 @@ instance FromJSON LFChannel where
     parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
 instance ToJSON LFChannel 
 
+data GetRoute = GetRoute {
+      route :: [Route] 
+    } deriving (Show, Generic)
+instance ToJSON GetRoute
+instance FromJSON GetRoute 
 
-
-
-
-
-
-
-
+data Route = Route {
+      ___id :: String 
+    , channel :: String 
+    , direction :: Int
+    , msatoshi :: Int 
+    , amount_msat :: String 
+    , delay :: Int 
+    , style :: String  
+    } deriving (Show, Generic, Eq) 
+instance FromJSON Route where 
+    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
+instance ToJSON Route 
 
