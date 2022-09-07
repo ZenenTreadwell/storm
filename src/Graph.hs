@@ -25,6 +25,7 @@ import GHC.Real
 import Data.List
 import Data.Maybe 
 import Data.Char
+import Data.Function.Flip
 
 type Gra = Gr Node' Edge'
 
@@ -77,13 +78,16 @@ islargest nc c = if (length.suc') nc > fst c then ( (length.suc') nc , node' nc 
 segponants gra stop = undefined
 
 getNodeInt :: String -> Node
-getNodeInt = fst.head.readHex.filter isHexDigit 
+getNodeInt s = case readHex.filter isHexDigit $ s of 
+    ([]) -> 0 
+    (x:_)-> fst x 
 
+--gfiltermap (about half of known nodes get turffed . . .) 
 deadends :: Context Node' Edge' -> Maybe (Context Node' Edge') 
 deadends c =
-    let inny = indeg' c == 0 
-        outy = outdeg' c == 0
-    in if inny || outy  
+    let inny = (indeg' c) == 0 
+        outy = (outdeg' c) == 0
+    in if (inny || outy)   
         then Nothing 
         else Just c
 
@@ -120,22 +124,39 @@ findPaths n v = do
     gra <- readIORef graphRef 
     case (match n gra, 
           match v gra) of 
-              ( (Just c@(_, _, _, outy), gra' ) ,
-                (Just d@(inny, _,_,_) , _ )     ) -> do 
-                  pure $ concat $ map (findPath gra' v inny) outy
+              ( (Just c@(_, _, _, outy), g' ) ,
+                (Just d@(inny, _,_,_) , _ )   ) -> do 
+                  pure $ map calcCrumb                                -- Path' -> Crumb
+                       $ map (\p -> reProcess gra ([n] <> p <> [v]) ) -- Path -> Path' 
+                       $ filter (not.null) 
+                       $ concat                                       -- [[Path]] -> [Path] 
+                       $ map (\f -> map (f.snd) outy)                 -- Node-> [Path]  
+                       $ map ((flip3 esp g').snd) inny                -- Node -> (Node -> Path)
               otherwise -> pure []   
-    where   
-        --findPath :: Gra -> Node -> LEdge Edge' -> Crumb 
-        findPath  = undefined -- g v' inny (_, n', e) = foldr crumpdate (initCrumb e) $ concat $ map (\(q,_) -> reProcess g $ esp n' q g) inny 
-
 
 reProcess :: Gra -> Path -> [(Edge', Node')]
 reProcess _ [] = [] 
 reProcess _ (x : []) = [] 
 reProcess g (x:y:z) = (doge g x y, gode g x) : reProcess g z
+    where 
+        gode g x = fromJust $ lab g x
+        doge g x y = snd $ head $ filter ((== y).fst) $ lsuc' $ context g x 
 
-gode g x = fromJust $ lab g x
-doge g x y = snd $ head $ filter ((== y).fst) $ lsuc' $ context g x 
+
+calcCrumb :: [(Edge', Node')] -> Crumb
+calcCrumb p' = foldr c2 initCrumb p' 
+
+c2 :: (Edge', Node') -> Crumb -> Crumb 
+c2 (e, n) c = C 
+    (hopsNow) 
+    (Fee 
+        ((base.cost) c + (base.fees) e ) 
+        (( (hops c) * ((ppm.cost) c) + ((ppm.fees) e)) `div` hopsNow)) 
+    (min (neck c) (collat e) ) 
+    (arrow c)    
+    where 
+        hopsNow = hops c + 1
+
 
 calcCapacity :: Gra -> Sat -> Sat
 calcCapacity g a 
@@ -144,7 +165,6 @@ calcCapacity g a
         (c, g') -> calcCapacity g' $ a + (sum $ map (collat.fst) 
                                               $ nubBy (\a b -> (short.fst) a == (short.fst) b) 
                                               $ lneighbors' c) 
-
 
 data Crumb = C {
       hops :: Int
@@ -160,16 +180,7 @@ instance ToJSON Crumb where
 toRoute :: (Edge', Node') -> Route
 toRoute (e,n) = undefined
 
-initCrumb :: (Edge', Node') -> Crumb 
-initCrumb e = C (1) (fees $ fst e) (collat $ fst e) (toRoute e : [])
-
-crumpdate :: (Edge', Node') -> Crumb -> Crumb 
-crumpdate e cr = C 
-    (hops cr + 1) 
-    (Fee 
-        ((base.cost) cr + (base.fees) (fst e) ) 
-        ((((ppm.cost) cr) + ((ppm.fees) $ fst e)) `div` 2)) -- not accurate overweights newest
-    (min (neck cr) (collat $ fst e))
-    (toRoute e : (arrow cr))
+initCrumb :: Crumb 
+initCrumb = C (0) (Fee 0 0) maxBound [] 
 
 

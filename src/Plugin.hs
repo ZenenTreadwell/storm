@@ -1,5 +1,5 @@
 {-# LANGUAGE 
-      LambdaCase
+    LambdaCase
     , OverloadedStrings 
     , DuplicateRecordFields
 #-}
@@ -113,7 +113,7 @@ hooks i m p =
           liftIO $ loadGraph   
           gra <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [
-                "success" .= order gra 
+                "nodes loaded" .= order gra 
               ]) i
     "stormsize" -> do 
           gra <- liftIO $ readIORef graphRef
@@ -132,7 +132,7 @@ hooks i m p =
           paths <- liftIO $ findPaths x y  
           lift $ yield $ Res (object [
                 "levels" .= show (foldr countNode [] $ level x gra) 
-              , "paypaths" .= show (map cost paths)     
+              , "paypaths" .= show (map (\s -> (hops s, cost s) )  paths)     
               ]) i 
           where 
               x = getNodeInt $ getNodeArg 0 p

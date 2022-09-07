@@ -35,6 +35,7 @@ dependencies:
 - fgl 
 - sqlite-simple
 - directory
+- composition-extra
 
 library:
   source-dirs: src
