@@ -111,21 +111,20 @@ hooks i m p =
     -- GRAPH 
     "stormload" -> do 
           liftIO $ loadGraph   
-          gra <- liftIO $ readIORef graphRef
+          g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [
-                "nodes loaded" .= order gra 
+                "nodes loaded" .= order g 
               ]) i
     "stormsize" -> do 
-          gra <- liftIO $ readIORef graphRef
+          g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [
-                "nodes" .= order gra 
-              , "edges" .= size gra 
-              , "capacity" .= calcCapacity gra 0 
+                "nodes" .= order g 
+              , "edges" .= size g 
+              , "capacity" .= calcCapacity g 0 
               ]) i
-          where sel3 (_,_,e) = e 
     "stormcomponents" -> do 
-          gra <- liftIO $ readIORef graphRef
-          lift $ yield $ Res (object [ "components" .= map length (components gra) ]) i
+          g <- liftIO $ readIORef graphRef
+          lift $ yield $ Res (object [ "components" .= map length (components g) ]) i
     "stormnode" -> rc
     "stormpaths" -> do 
           gra <- liftIO $ readIORef graphRef
@@ -140,6 +139,7 @@ hooks i m p =
               countNode (_, d) c = case (lookup d c) of 
                   (Just b) -> (d, b + 1) : (filter (\(x, _) -> x /= d) c)
                   Nothing -> (d, 1) : c
+    -- UTIL 
     "stormwallet" -> do 
           fun <- liftIO $ listFunds  
           case fun of 

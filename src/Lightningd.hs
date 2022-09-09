@@ -40,7 +40,8 @@ instance FromJSON Snapshot
 data Saccount = Saccount {
       account_id :: String 
     , balance :: String 
-    , coin_type :: String } deriving (Show, Generic) 
+    , coin_type :: String
+    } deriving (Show, Generic) 
 instance FromJSON Saccount 
 
 data CoinMovement = CoinMovement {
@@ -140,15 +141,35 @@ instance FromJSON ListNodes
 
 data NodeInfo = NodeInfo {
       nodeid :: String 
-    , alias :: Maybe String 
-    , color :: Maybe String 
     , last_timestamp :: Maybe Int 
+    , __alias :: Maybe String 
+    , __color :: Maybe String 
     , features :: Maybe String
-    --, addresses :: [Addr]   
+    , addresses :: Maybe [Addr] 
+    , option_will_fund :: Maybe WillFund  
     } deriving (Generic, Show) 
-instance FromJSON NodeInfo
 instance ToJSON NodeInfo
---data Addr = Addr {
+instance FromJSON NodeInfo where 
+    parseJSON = genericParseJSON defaultOptions{
+          fieldLabelModifier = dropWhile (=='_')
+        , omitNothingFields = True } 
+data Addr = Addr {
+      __type :: String 
+    , __address :: String 
+    , __port :: String 
+    } deriving (Generic, Show) 
+instance ToJSON Addr
+instance FromJSON Addr where 
+    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
+data WillFund = WillFund {
+      lease_fee_base_msat :: Int
+    , lease_fee_basis :: Int
+    , funding_weight :: Int
+    , channel_fee_max_base_msat :: Int 
+    , compact_lease :: String 
+    } deriving (Generic, Show)
+instance ToJSON WillFund
+instance FromJSON WillFund 
 
 data ListFunds = ListFunds {
       outputs :: [LFOutput]

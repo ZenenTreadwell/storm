@@ -31,6 +31,7 @@ import Data.Text
 
 type Cln a = IO (Maybe (Fin (Res a)))
 
+tick :: IO Value
 tick = do 
     i <- readIORef idref
     writeIORef idref (i + 1) 
@@ -40,7 +41,7 @@ idref :: IORef Int
 idref = unsafePerformIO $ newIORef (1 :: Int) 
 
 clnref :: IORef Handle 
-clnref = unsafePerformIO $ newIORef stderr
+clnref = unsafePerformIO $ newIORef stderr -- stderr is a placeholder until init calls conectCln
 
 connectCln :: String -> IO ()
 connectCln d = (socket AF_UNIX Stream 0) >>= \soc -> do 
@@ -49,14 +50,13 @@ connectCln d = (socket AF_UNIX Stream 0) >>= \soc -> do
     writeIORef clnref h
 
 getRes :: FromJSON a => IO (Maybe (Fin a))
-getRes = do 
-    h <- readIORef clnref
-    runConduit $ sourceHandle h .| (jinjin) .| (await >>= pure)
+getRes = (readIORef clnref) >>= \h -> runConduit $
+    sourceHandle h .| 
+    jinjin         .|
+    await >>= pure
 
 reqToHandle :: ToJSON a => a -> IO ()
-reqToHandle r = do
-    h <- readIORef clnref 
-    L.hPutStr h $ encode r 
+reqToHandle a = (readIORef clnref) >>= \h -> L.hPutStr h $ encode a 
 
 getinfo :: Cln GetInfo 
 getinfo = do 
@@ -88,10 +88,11 @@ allchannels = do
     reqToHandle $ Req ("listchannels"::Text) (object []) (Just $ i)     
     getRes 
 
+-- INVALID XXX WTH
 allnodes :: Cln ListNodes
 allnodes = do 
     i <- tick
-    reqToHandle $ Req ("listnodes"::Text) (object []) (Just $ i)     
+    reqToHandle $ Req ("listnodes"::Text) (object [ ]) (Just $ i)     
     getRes 
 
 listFunds :: Cln ListFunds
