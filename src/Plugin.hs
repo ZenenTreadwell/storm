@@ -10,6 +10,7 @@ import Manifest (manifest)
 import Lightningd 
 import Cli
 import Graph 
+import Paths
 import Numeric
 import System.IO
 import Control.Monad.IO.Class
@@ -129,10 +130,7 @@ hooks i m p =
     "stormpaths" -> do 
           gra <- liftIO $ readIORef graphRef
           paths <- liftIO $ findPaths x y  
-          lift $ yield $ Res (object [
-                "levels" .= show (foldr countNode [] $ level x gra) 
-              , "paypaths" .= show (map (\s -> (hops s, cost s) )  paths)     
-              ]) i 
+          lift $ yield $ Res (toJSON paths) i 
           where 
               x = getNodeInt $ getNodeArg 0 p
               y = getNodeInt $ getNodeArg 1 p 
@@ -148,14 +146,18 @@ hooks i m p =
               _ -> rc 
           where 
               summarizeFunds j = object [
-                    "onChain" .= ((`div` 1000) $ sum  $ map ((read :: String -> Int) . (takeWhile isDigit) . (amount_msat :: LFOutput -> String)) (outputs j))
-                  , "inChannel" .= (foldr channelBreakdown [] $ ((channels :: ListFunds -> [LFChannel]) j))  
+                    "onChain" .= ((`div` 1000) $ sum  $ map ((read :: String -> Int) .
+                                 (takeWhile isDigit) . (amount_msat :: LFOutput -> String)) (outputs j))
+                  , "inChannel" .= (foldr channelBreakdown [] $ (channels :: ListFunds -> [LFChannel]) j )  
                   ]                
                   where channelBreakdown :: LFChannel -> [(String, Int)] -> [(String, Int)] 
                         channelBreakdown x a = case lookup (__state x) a of 
-                            Just cur -> (__state  x, cur + readAmount x) : (filter ((/= (__state x)).fst) a)  
+                            Just cur -> (__state  x, cur + readAmount x) : 
+                                        (filter ((/= (__state x)).fst) a)  
                             Nothing -> (__state  x, readAmount x) : a
-                        readAmount = ((read :: String -> Int) . (takeWhile isDigit) . (our_amount_msat :: LFChannel -> String))
+                        readAmount = ((read :: String -> Int) . 
+                                     (takeWhile isDigit) . 
+                                     (our_amount_msat :: LFChannel -> String))
     
 getNodeArg i v = case v ^? nth i . _String of
     (Just b) -> filter isHexDigit (show b) 
