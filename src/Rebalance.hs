@@ -16,7 +16,7 @@ import Graph
 import Jspec
 
 rebalance :: IO () 
-rebalance = (listFunds) >>= \case 
+rebalance = (listfunds) >>= \case 
     (Just (Correct (Res funds _))) -> getinfo >>= \case 
         (Just (Correct (Res info  _))) -> do 
             g <- readIORef graphRef

@@ -84,6 +84,13 @@ data Payment = Payment {
 instance FromJSON Payment
 
 --RPC data
+
+data NewAddr = NewAddr {
+    bech32 :: String 
+    } deriving (Show, Generic)
+instance FromJSON NewAddr
+
+
 data Invoice = Invoice {
       payment_hash :: String
     , expires_at :: Int
@@ -98,18 +105,32 @@ data GetInfo = GetInfo {
     , __color :: String 
     , num_peers :: Int 
     , num_pending_channels :: Int 
-    , lightning5dir  :: String
     , num_active_channels :: Int
     , num_inactive_channels :: Int
+    --, __address :: [Addr]
+    --, binding :: [Addr] 
+    , __version :: String 
     , blockheight :: Int
-    , network :: String
-    , msatoshi_fees_collected :: Int
+    , __network :: String
+    , fees_collected_msat :: Int
+    , lightning5dir :: String
+    , our_features :: Features 
     } deriving (Generic, Show)
 instance ToJSON GetInfo
 instance FromJSON GetInfo where
     parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = map repl . dropWhile (=='_')} v
 repl '5' = '-'
 repl o = o
+
+data Features = Features {
+      __init :: String
+    , node :: String 
+    , channel :: String 
+    , invoice :: String 
+    } deriving (Generic, Show)
+instance ToJSON Features 
+instance FromJSON Features where  
+    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
                                                                        
 data ListChannels = ListChannels { 
         channels :: [Channel] 
@@ -121,23 +142,31 @@ data Channel = Channel {
       source :: String
     , destination :: String 
     , short_channel_id :: String
-    , __public :: Bool
-    , satoshis :: Int
+    , public :: Bool
+    , amount_msat :: Msat
+    , message_flags :: Int
+    , channel_flags :: Int
+    , active :: Bool
     , last_update :: Int
     , base_fee_millisatoshi :: Int
     , fee_per_millionth :: Int 
     , delay :: Int
-    , htlc_minimum_msat :: String
-    , htlc_maximum_msat :: String
+    , htlc_minimum_msat :: Msat
+    , htlc_maximum_msat :: Maybe Msat
     , features :: String 
     } deriving (Show, Generic) 
 instance FromJSON Channel where 
-    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
+    parseJSON v = genericParseJSON defaultOptions{
+          fieldLabelModifier = dropWhile (=='_')
+        , omitNothingFields = True } v
 instance ToJSON Channel
 
-data ListNodes = ListNodes {eNodes :: [NodeInfo]} deriving (Show, Generic)
+data ListNodes = ListNodes {
+      _nodes :: [NodeInfo]
+    } deriving (Show, Generic)
 instance ToJSON ListNodes 
-instance FromJSON ListNodes 
+instance FromJSON ListNodes where 
+    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
 
 data NodeInfo = NodeInfo {
       nodeid :: String 
@@ -145,7 +174,7 @@ data NodeInfo = NodeInfo {
     , __alias :: Maybe String 
     , __color :: Maybe String 
     , features :: Maybe String
-    , addresses :: Maybe [Addr] 
+    --, addresses :: Maybe [Addr] 
     , option_will_fund :: Maybe WillFund  
     } deriving (Generic, Show) 
 instance ToJSON NodeInfo
@@ -177,20 +206,38 @@ data ListFunds = ListFunds {
     } deriving (Show, Generic) 
 instance FromJSON ListFunds
 instance ToJSON ListFunds
+
 data LFOutput = LFOutput {
-      amount_msat :: String 
+      txid :: String 
+    , output :: Int
+    , amount_msat :: Msat  
+    , scriptpubkey :: String 
+    , address :: String 
     , status :: String 
+    , blockheight :: Maybe Int 
+    , reserved :: Bool 
+    , reserved_to_block :: Maybe Int 
     } deriving (Show, Generic)  
-instance FromJSON LFOutput
+instance FromJSON LFOutput where
+    parseJSON v = genericParseJSON defaultOptions{
+          fieldLabelModifier = dropWhile (=='_')
+        , omitNothingFields = True } v
 instance ToJSON LFOutput
 
 data LFChannel = LFChannel {
-      amount_msat :: String 
-    , our_amount_msat :: String  
+      peer_id :: String
+    , connected :: Bool
     , __state :: String
+    , short_channel_id :: Maybe String
+    , our_amount_msat :: Msat  
+    , amount_msat :: Msat 
+    , funding_txid :: Maybe String
+    , funding_output :: Maybe Int 
     } deriving (Show, Generic) 
 instance FromJSON LFChannel where 
-    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
+    parseJSON v = genericParseJSON defaultOptions{
+          fieldLabelModifier = dropWhile (=='_')
+        , omitNothingFields = True } v
 instance ToJSON LFChannel 
 
 data GetRoute = GetRoute {
@@ -203,12 +250,12 @@ data Route = Route {
       ___id :: String 
     , channel :: String 
     , direction :: Int
-    , msatoshi :: Int 
-    , amount_msat :: String 
+    , amount_msat :: Msat 
     , delay :: Int 
     , style :: String  
     } deriving (Show, Generic, Eq) 
 instance FromJSON Route where 
     parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
-instance ToJSON Route 
+instance ToJSON Route where
+    toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
 

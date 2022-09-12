@@ -56,7 +56,18 @@ getRes = (readIORef clnref) >>= \h -> runConduit $
     await >>= pure
 
 reqToHandle :: ToJSON a => a -> IO ()
-reqToHandle a = (readIORef clnref) >>= \h -> L.hPutStr h $ encode a 
+reqToHandle a = 
+    let encoded = encode a
+    in do 
+        L.appendFile "/home/o/Desktop/logy" $ encoded <> "\n"
+        (readIORef clnref) >>= \h -> L.hPutStr h encoded 
+
+newaddr :: Cln NewAddr 
+newaddr = do 
+    i <- tick 
+    reqToHandle $ Req ("newaddr"::Text) (object []) (Just $ i )
+    getRes
+
 
 getinfo :: Cln GetInfo 
 getinfo = do 
@@ -88,15 +99,14 @@ allchannels = do
     reqToHandle $ Req ("listchannels"::Text) (object []) (Just $ i)     
     getRes 
 
--- INVALID XXX WTH
 allnodes :: Cln ListNodes
 allnodes = do 
     i <- tick
-    reqToHandle $ Req ("listnodes"::Text) (object [ ]) (Just $ i)     
+    reqToHandle $ Req ("listnodes"::Text) (object []) (Just $ i)     
     getRes 
 
-listFunds :: Cln ListFunds
-listFunds = do 
+listfunds :: Cln ListFunds
+listfunds = do 
     i <- tick
     reqToHandle $ Req ("listfunds"::Text) (object []) (Just $ i) 
     getRes 

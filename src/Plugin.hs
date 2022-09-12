@@ -130,34 +130,28 @@ hooks i m p =
     "stormpaths" -> do 
           gra <- liftIO $ readIORef graphRef
           paths <- liftIO $ findPaths x y  
-          lift $ yield $ Res (toJSON paths) i 
+          lift $ yield $ Res (toJSON.(take 51) $ paths) i 
           where 
               x = getNodeInt $ getNodeArg 0 p
               y = getNodeInt $ getNodeArg 1 p 
-              countNode (_, d) c = case (lookup d c) of 
-                  (Just b) -> (d, b + 1) : (filter (\(x, _) -> x /= d) c)
-                  Nothing -> (d, 1) : c
     -- UTIL 
     "stormwallet" -> do 
-          fun <- liftIO $ listFunds  
+          fun <- liftIO $ listfunds  
           case fun of 
               (Just (Correct (Res fun' _))) -> 
                   lift $ yield $ Res (summarizeFunds fun') i   
-              _ -> rc 
+              (Just x) -> lift $ yield $ Res (object ["x" .= (show x)]) i
+              otherwise -> rc
           where 
               summarizeFunds j = object [
-                    "onChain" .= ((`div` 1000) $ sum  $ map ((read :: String -> Int) .
-                                 (takeWhile isDigit) . (amount_msat :: LFOutput -> String)) (outputs j))
+                    "onChain" .= ((`div` 1000) $ sum  $ map  (amount_msat :: LFOutput -> Msat) (outputs j))
                   , "inChannel" .= (foldr channelBreakdown [] $ (channels :: ListFunds -> [LFChannel]) j )  
                   ]                
                   where channelBreakdown :: LFChannel -> [(String, Int)] -> [(String, Int)] 
                         channelBreakdown x a = case lookup (__state x) a of 
-                            Just cur -> (__state  x, cur + readAmount x) : 
+                            Just cur -> (__state  x, cur + (our_amount_msat :: LFChannel -> Msat) x) : 
                                         (filter ((/= (__state x)).fst) a)  
-                            Nothing -> (__state  x, readAmount x) : a
-                        readAmount = ((read :: String -> Int) . 
-                                     (takeWhile isDigit) . 
-                                     (our_amount_msat :: LFChannel -> String))
+                            Nothing -> (__state  x, (our_amount_msat :: LFChannel -> Msat) x) : a
     
 getNodeArg i v = case v ^? nth i . _String of
     (Just b) -> filter isHexDigit (show b) 
