@@ -128,9 +128,8 @@ hooks i m p =
           lift $ yield $ Res (object [ "components" .= map length (components g) ]) i
     "stormnode" -> rc
     "stormpaths" -> do 
-          gra <- liftIO $ readIORef graphRef
           paths <- liftIO $ findPaths x y  
-          lift $ yield $ Res (toJSON.(take 51) $ paths) i 
+          lift $ yield $ Res (toJSON.(take 5) $ paths) i 
           where 
               x = getNodeInt $ getNodeArg 0 p
               y = getNodeInt $ getNodeArg 1 p 
