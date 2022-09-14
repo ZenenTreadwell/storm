@@ -5,7 +5,6 @@
     OverloadedStrings
 #-}
 
-
 module Paths where 
 
 import Lightningd
@@ -49,8 +48,8 @@ findPaths n v = do
     gra <- readIORef graphRef 
     case (match n gra, 
           match v gra) of 
-              ( (Just c@(_, _, _, outy), g) ,
-                (Just d@(inny, _,_,_) , _ )   ) -> do
+              ( (Just (_, _, _, outy), g) ,
+                (Just (inny, _,_,_) , _ )   ) -> do
                     -- XXX
                     -- large nodes take hours
                     -- n*m over lesp
@@ -64,14 +63,12 @@ findPaths n v = do
               otherwise -> pure []
 
 
-
--- much faster
--- misses longer paths with possibly lower fees 
-bftFindPaths :: Node -> Node -> IO [PathInfo]
-bftFindPaths n v = do 
+-- 
+bftFindV1 :: Node -> Node -> IO [PathInfo]
+bftFindV1 n v = do 
     g <- readIORef graphRef
     case (match n g) of 
-        (Just c@(_, _, _, outy), g) -> do 
+        (Just (_, _, _, outy), g) -> do 
             pure 
             $ sort    
             $ map (\s -> foldr c2 (initP s) s)  
@@ -82,9 +79,25 @@ bftFindPaths n v = do
         otherwise -> pure []    
 
 
-pp :: [LNode Channel] -> [Channel]
-pp [] = [] 
-pp p = map snd p  
+bftFindPaths :: Node -> Node -> IO [PathInfo]
+bftFindPaths n v = do 
+    gra <- readIORef graphRef
+    case ( match n gra                ,  match v gra) of 
+        ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> do 
+            pure
+            $ sort    
+            $ map (\s -> foldr c2 (initP s) s)  
+            $ map (\(f,p, e) -> [f] <> ( (lp.unLPath) p) <> [e] ) 
+            $ concat
+            $ map (\(e, v') -> map (\(f,t) -> (f, getLPath v' t, e)) rtrees) inny2  
+                    
+            where 
+                rtrees = map (\(f, n') -> (f, lbft n' g)) outy2
+                -- direct channel broke it , direct channel is valid path, add
+                outy2 = filter (\(f, n') -> v /= n') outy
+                inny2 = filter (\(f, n') -> n /= n') inny
+        otherwise -> pure []    
+
 
 -- get channels, throw out top
 lp :: [LNode Channel] -> [Channel]

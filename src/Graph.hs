@@ -43,47 +43,21 @@ toLNode ni = ( (getNodeInt.nodeid) ni , ni)
 toLEdge' :: Channel -> LEdge Channel
 toLEdge' c = ( (getNodeInt.source) c  , (getNodeInt.destination) c, c )
 
+--- XXX
+--- hangs on re-call, why?
 loadGraph :: IO ()
 loadGraph = (allchannels) >>= \case 
     (Just (Correct (Res listchannels _))) -> (allnodes) >>= \case 
         (Just (Correct (Res listnodes _))) -> do 
-            liftIO $ writeIORef graphRef $ mkGraph (map toLNode nx) (map toLEdge' cx) 
-            where cx = (channels::ListChannels->[Channel]) listchannels 
-                  nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
+            liftIO $ writeIORef graphRef
+                   $ gfiltermap deadends
+                   $ mkGraph (map toLNode nx) (map toLEdge' cx)
+                   where cx = (channels::ListChannels->[Channel]) listchannels 
+                         nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
         otherwise -> pure () 
     otherwise -> pure () 
 
---mockInfo :: String -> NodeInfo
---mockInfo s = NodeInfo s Nothing Nothing Nothing Nothing Nothing Nothing 
---
---mockInto :: String -> LNode NodeInfo  
---mockInto = toLNode.mockInfo
---
---loadBfs :: Int -> String -> IO () 
---loadBfs d ns 
---    | d == 0 = pure () 
---    | otherwise = do 
---       gra <- liftIO $ readIORef graphRef 
---       (channelsbysource ns) >>= \case 
---           (Just (Correct (Res listchannels _))) -> do 
---                liftIO $ writeIORef graphRef $ foldr buildg gra lc
---                x <- mapM (loadBfs (d-1)) $ map destination lc 
---                pure () 
---                where
---                    lc = (channels :: ListChannels -> [Channel] ) listchannels
---           otherwise -> pure ()  
---
---buildg :: Channel -> Gra -> Gra
---buildg c g = 
---    let a = source c
---        b = destination c 
---        e = toLEdge' c
---    in case (gelem (getNodeInt a) g, gelem (getNodeInt b) g) of 
---        (True, True) -> insEdge e g
---        (False, True) -> insEdge e (insNode (mockInto a) g)
---        (True, False) -> insEdge e (insNode (mockInto b) g) 
---        (False, False) -> insEdge e (insNode (mockInto a) (insNode (mockInto b) g)) 
-
+--- seems like it could be faster
 capacity :: Gra -> Sat -> Sat
 capacity g a 
     | isEmpty g = a 
