@@ -14,6 +14,8 @@ import Graph
 import System.IO
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.Query
+import Data.Graph.Inductive.Query.BFS
+import Data.Graph.Inductive.Internal.RootPath
 import Data.Aeson 
 import GHC.Generics
 import Numeric 
@@ -32,9 +34,8 @@ instance ToJSON PathInfo where
           "hops" .= hops p
         , "cost" .= cost p
         , "neck" .= neck p
-        , "route" .= cRoute 700700 p
+        , "route" .= cRoute 1000000 p
         ]
-
 
 logg = System.IO.appendFile "/home/o/Desktop/logy"
 
@@ -50,7 +51,12 @@ findPaths n v = do
           match v gra) of 
               ( (Just c@(_, _, _, outy), g) ,
                 (Just d@(inny, _,_,_) , _ )   ) -> do
-                    pure $ map (\s -> foldr c2 (initP s) s)  
+                    -- XXX
+                    -- large nodes take hours
+                    -- n*m over lesp
+                    -- XXX 
+                    pure $ sort 
+                         $ map (\s -> foldr c2 (initP s) s)  
                          $ map (\(f, l, x) -> [f] ++ (lp (unLPath l)) ++ [x]) 
                          $ concat  
                          $ map (\(x,f) -> map (\o -> (fst o , f (snd o), x)) outy )
@@ -58,12 +64,32 @@ findPaths n v = do
               otherwise -> pure []
 
 
---lp :: l -> [Channel]
+
+-- much faster
+-- misses longer paths with possibly lower fees 
+bftFindPaths :: Node -> Node -> IO [PathInfo]
+bftFindPaths n v = do 
+    g <- readIORef graphRef
+    case (match n g) of 
+        (Just c@(_, _, _, outy), g) -> do 
+            pure 
+            $ sort    
+            $ map (\s -> foldr c2 (initP s) s)  
+            $ map (\(f,p) -> [f] <> ( (reverse.lp.unLPath) p) ) 
+            $ map (\(c, n') -> (c, getLPath n' rtree)) outy  
+            where 
+                rtree = lbft v g 
+        otherwise -> pure []    
+
+
+pp :: [LNode Channel] -> [Channel]
+pp [] = [] 
+pp p = map snd p  
+
+-- get channels, throw out top
 lp :: [LNode Channel] -> [Channel]
 lp [] = [] 
 lp (p:px) = map snd px  
-
-
 
 c2 :: Channel -> PathInfo -> PathInfo
 c2 e c = P
@@ -82,8 +108,11 @@ instance Eq PathInfo where
     (==) a b = (base.cost $ a) == (base.cost $ b) && (ppm.cost $ a) == (ppm.cost $ b)
 
 instance Ord PathInfo where 
-    compare a b = compare (cost a) (cost b) 
+    compare a b = compare (cost b) (cost a) 
 
+cRoute :: Msat -> PathInfo -> [Route] 
+cRoute a c | a > neck c = [] 
+cRoute a c = reverse $ foldr (c3 a) [] $ reverse . path $ c 
 c3 :: Msat -> Channel -> [Route] -> [Route] 
 c3 a c r = Route 
     (destination c) 
@@ -99,10 +128,6 @@ c3 a c r = Route
         getDelay e (r:_) = (delay::(Channel->Int)) e + (delay::(Route->Int)) r         
         getAmount :: Msat -> Channel -> [Route] -> Msat 
         getAmount a _ [] = a
-        getAmount _ e (r:_) = (amount_msat::Route->Msat) r - (base_fee_millisatoshi e) -- xxx ppm   
-
-cRoute :: Msat -> PathInfo -> [Route] 
-cRoute a c | a > neck c = [] 
-cRoute a c = reverse $ foldr (c3 a) [] $ reverse . path $ c 
+        getAmount _ e (r:_) = (amount_msat::Route->Msat) r + (base_fee_millisatoshi e) -- xxx ppm   
 
 

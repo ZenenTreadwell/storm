@@ -84,11 +84,11 @@ loadGraph = (allchannels) >>= \case
 --        (True, False) -> insEdge e (insNode (mockInto b) g) 
 --        (False, False) -> insEdge e (insNode (mockInto a) (insNode (mockInto b) g)) 
 
-calcCapacity :: Gra -> Sat -> Sat
-calcCapacity g a 
+capacity :: Gra -> Sat -> Sat
+capacity g a 
     | isEmpty g = a 
     | otherwise = case matchAny g of 
-        (c, g') -> calcCapacity g' $ a + (sum 
+        (c, g') -> capacity g' $ a + (sum 
             $ map ((amount_msat::Channel->Msat).fst) 
             $ nubBy (\x y -> (==) 
                 (((short_channel_id::Channel->String).fst) x)     

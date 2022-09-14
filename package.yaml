@@ -36,6 +36,7 @@ dependencies:
 - sqlite-simple
 - directory
 - composition-extra
+- format-numbers
 
 library:
   source-dirs: src

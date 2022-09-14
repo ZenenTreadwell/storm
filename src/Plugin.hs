@@ -35,6 +35,7 @@ import Data.Conduit
 import Data.Foldable 
 import Data.List 
 import Data.Char 
+import Data.Text.Format.Numbers
 
 type Method = Text 
 type Params = Value
@@ -120,16 +121,16 @@ hooks i m p =
           g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [
                 "nodes" .= order g 
-              , "edges" .= size g 
-              , "capacity" .= calcCapacity g 0 
+              , "edges" .= size g
+              , "capacity" .= capacity g 0 
               ]) i
     "stormcomponents" -> do 
           g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [ "components" .= map length (components g) ]) i
     "stormnode" -> rc
     "stormpaths" -> do 
-          paths <- liftIO $ findPaths x y  
-          lift $ yield $ Res (toJSON.(take 5) $ paths) i 
+          paths <- liftIO $ bftFindPaths x y  
+          lift $ yield $ Res (toJSON paths) i 
           where 
               x = getNodeInt $ getNodeArg 0 p
               y = getNodeInt $ getNodeArg 1 p 
@@ -143,15 +144,22 @@ hooks i m p =
               otherwise -> rc
           where 
               summarizeFunds j = object [
-                    "onChain" .= ((`div` 1000) $ sum  $ map  (amount_msat :: LFOutput -> Msat) (outputs j))
-                  , "inChannel" .= (foldr channelBreakdown [] $ (channels :: ListFunds -> [LFChannel]) j )  
+                    "sat for channels or withdraw" .= ( prettyI (Just ',') $ (`div` 1000) $ sum  $ map  (amount_msat :: LFOutput -> Msat) (outputs j))
+                  , "sat for pay" .= (prettyI (Just ',') ourTote)
+                  , "sat in limbo" .=  (object $ map (\(s',i')-> ( (fromString s') .= (prettyI (Just ',') (div i' 1000)))) 
+                                            $ filter (\x -> (fst x) /= ("CHANNELD_NORMAL"::String)) $ foldr channelBreakdown [] c' )
+                  , "sat recievable" .= (prettyI (Just ',') (tote - ourTote) )   
                   ]                
-                  where channelBreakdown :: LFChannel -> [(String, Int)] -> [(String, Int)] 
+                  where tote = (`div`1000).sum $ map (amount_msat::LFChannel->Msat) normies
+                        ourTote = (`div`1000).sum $ map our_amount_msat normies
+                        normies = filter (\c -> __state c == "CHANNELD_NORMAL") $ c'
+                        c' = (channels :: ListFunds -> [LFChannel]) j
+                        channelBreakdown :: LFChannel -> [(String, Int)] -> [(String, Int)] 
                         channelBreakdown x a = case lookup (__state x) a of 
                             Just cur -> (__state  x, cur + (our_amount_msat :: LFChannel -> Msat) x) : 
                                         (filter ((/= (__state x)).fst) a)  
                             Nothing -> (__state  x, (our_amount_msat :: LFChannel -> Msat) x) : a
-    
+
 getNodeArg i v = case v ^? nth i . _String of
     (Just b) -> filter isHexDigit (show b) 
     Nothing -> ""
