@@ -50,10 +50,7 @@ findPaths n v = do
           match v gra) of 
               ( (Just (_, _, _, outy), g) ,
                 (Just (inny, _,_,_) , _ )   ) -> do
-                    -- XXX
-                    -- large nodes take hours
-                    -- n*m over lesp
-                    -- XXX 
+                    -- XXX n*m over lesp too slow
                     pure $ sort 
                          $ map (\s -> foldr c2 (initP s) s)  
                          $ map (\(f, l, x) -> [f] ++ (lp (unLPath l)) ++ [x]) 
@@ -62,8 +59,6 @@ findPaths n v = do
                          $ map (\j -> (fst j , flip3 lesp g (snd j))) inny
               otherwise -> pure []
 
-
--- 
 bftFindV1 :: Node -> Node -> IO [PathInfo]
 bftFindV1 n v = do 
     g <- readIORef graphRef
@@ -78,7 +73,6 @@ bftFindV1 n v = do
                 rtree = lbft v g 
         otherwise -> pure []    
 
-
 bftFindPaths :: Node -> Node -> IO [PathInfo]
 bftFindPaths n v = do 
     gra <- readIORef graphRef
@@ -88,16 +82,15 @@ bftFindPaths n v = do
             $ sort    
             $ map (\s -> foldr c2 (initP s) s)  
             $ map (\(f,p, e) -> [f] <> ( (lp.unLPath) p) <> [e] ) 
+            $ filter (\(_,p,_)-> (length.unLPath) p > 0)
             $ concat
             $ map (\(e, v') -> map (\(f,t) -> (f, getLPath v' t, e)) rtrees) inny2  
-                    
             where 
                 rtrees = map (\(f, n') -> (f, lbft n' g)) outy2
-                -- direct channel broke it , direct channel is valid path, add
+                -- direct channel broke it ? 
                 outy2 = filter (\(f, n') -> v /= n') outy
                 inny2 = filter (\(f, n') -> n /= n') inny
         otherwise -> pure []    
-
 
 -- get channels, throw out top
 lp :: [LNode Channel] -> [Channel]
@@ -113,7 +106,6 @@ c2 e c = P
     (min (neck c) ((amount_msat::Channel->Msat) e ) )
     (path c)
 
-
 instance Ord Fee where 
     compare a b = compare (base a + ppm a) (base b + ppm b)
 
@@ -121,11 +113,12 @@ instance Eq PathInfo where
     (==) a b = (base.cost $ a) == (base.cost $ b) && (ppm.cost $ a) == (ppm.cost $ b)
 
 instance Ord PathInfo where 
-    compare a b = compare (cost b) (cost a) 
+    compare a b = compare (cost a) (cost b) 
 
 cRoute :: Msat -> PathInfo -> [Route] 
 cRoute a c | a > neck c = [] 
-cRoute a c = reverse $ foldr (c3 a) [] $ reverse . path $ c 
+cRoute a c = foldr (c3 a) [] $ path $ c 
+
 c3 :: Msat -> Channel -> [Route] -> [Route] 
 c3 a c r = Route 
     (destination c) 
@@ -136,11 +129,16 @@ c3 a c r = Route
     "tlv" 
     : r 
     where 
+        getDirect :: String -> String -> Int
         getDirect a b = if readHex a < readHex b then 0 else 1
-        getDelay e [] = (delay::(Channel->Int)) e
-        getDelay e (r:_) = (delay::(Channel->Int)) e + (delay::(Route->Int)) r         
-        getAmount :: Msat -> Channel -> [Route] -> Msat 
-        getAmount a _ [] = a
-        getAmount _ e (r:_) = (amount_msat::Route->Msat) r + (base_fee_millisatoshi e) -- xxx ppm   
 
+        getDelay :: Channel -> [Route] -> Int
+        getDelay e [] = 9
+        getDelay e (r:_) = (delay::Route->Int) r + (delay::Channel->Int) e         
+        
+        getAmount :: Msat -> Channel -> [Route] -> Msat
+        getAmount a e [] = a
+        getAmount a e r = (+)   
+            (maximum $ map (amount_msat::Route->Msat) r)
+            (base_fee_millisatoshi e + ( div (1000000 * a * (fee_per_millionth e)) (1000000*1000000))) 
 
