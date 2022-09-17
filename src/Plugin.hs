@@ -11,7 +11,7 @@ import Lightningd
 import Cli
 import Graph 
 import Paths
-import Numeric
+import Rebalance
 import System.IO
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class 
@@ -36,6 +36,7 @@ import Data.Foldable
 import Data.List 
 import Data.Char 
 import Data.Text.Format.Numbers
+import Numeric
 
 type Method = Text 
 type Params = Value
@@ -144,11 +145,14 @@ hooks i m p =
               otherwise -> rc
           where 
               summarizeFunds j = object [
-                    "sat for channels or withdraw" .= ( prettyI (Just ',') $ (`div` 1000) $ sum  $ map  (amount_msat :: LFOutput -> Msat) (outputs j))
-                  , "sat for pay" .= (prettyI (Just ',') ourTote)
-                  , "sat in limbo" .=  (object $ map (\(s',i')-> ( (fromString s') .= (prettyI (Just ',') (div i' 1000)))) 
-                                            $ filter (\x -> (fst x) /= ("CHANNELD_NORMAL"::String)) $ foldr channelBreakdown [] c' )
-                  , "sat recievable" .= (prettyI (Just ',') (tote - ourTote) )   
+                    "sat chain withdraw or channel(s)" .= (prettyI (Just ',') 
+                        $ (`div` 1000) $ sum  $ map  (amount_msat :: LFOutput -> Msat) (outputs j))
+                  , "sat lightning pay | invoice" .= (
+                        (prettyI (Just ',') ourTote) <> " | " <> (prettyI (Just ',') (tote - ourTote) )   
+                  ), "ye limbo" .=  (object $ map (\(s',i')-> ( (fromString s') .= (prettyI (Just ',') (div i' 1000)))) 
+                                            $ filter (\x -> (fst x) /= ("CHANNELD_NORMAL"::String))
+                                            $ foldr channelBreakdown [] c' )
+                  , "ze balances" .= (countPots $ pots $ filter (isJust.sci) c') 
                   ]                
                   where tote = (`div`1000).sum $ map (amount_msat::LFChannel->Msat) normies
                         ourTote = (`div`1000).sum $ map our_amount_msat normies
@@ -159,6 +163,14 @@ hooks i m p =
                             Just cur -> (__state  x, cur + (our_amount_msat :: LFChannel -> Msat) x) : 
                                         (filter ((/= (__state x)).fst) a)  
                             Nothing -> (__state  x, (our_amount_msat :: LFChannel -> Msat) x) : a
+
+countPots (a,b,c,d,e) = object [
+     "a. depleted" .= length a
+    ,"b. mid-low" .= length b 
+    , "c. balanced" .= length c 
+    , "d. mid-high" .= length d
+    , "e. full" .= length e  
+    ]
 
 getNodeArg i v = case v ^? nth i . _String of
     (Just b) -> filter isHexDigit (show b) 

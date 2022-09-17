@@ -73,6 +73,7 @@ bftFindV1 n v = do
                 rtree = lbft v g 
         otherwise -> pure []    
 
+-- possibly too slow, if want multi bft trees should do manually? 
 bftFindPaths :: Node -> Node -> IO [PathInfo]
 bftFindPaths n v = do 
     gra <- readIORef graphRef
@@ -80,6 +81,7 @@ bftFindPaths n v = do
         ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> do 
             pure
             $ sort    
+            -- uncurried helps me follow the types but 
             $ map (\s -> foldr c2 (initP s) s)  
             $ map (\(f,p, e) -> [f] <> ( (lp.unLPath) p) <> [e] ) 
             $ filter (\(_,p,_)-> (length.unLPath) p > 0)
@@ -97,12 +99,12 @@ lp :: [LNode Channel] -> [Channel]
 lp [] = [] 
 lp (p:px) = map snd px  
 
-c2 :: Channel -> PathInfo -> PathInfo
+c2 :: Channel -> PathInfo -> PathInfo 
 c2 e c = P
     (hops c + 1)
     (Fee
         ( (base.cost) c + base_fee_millisatoshi e )
-        ( ((hops c + 1)*((ppm.cost) c) + fee_per_millionth e ) `div` (hops c + 2) ))-- accurate?
+        ( ((hops c + 1)*((ppm.cost) c) + fee_per_millionth e ) `div` (hops c + 2) ))
     (min (neck c) ((amount_msat::Channel->Msat) e ) )
     (path c)
 
@@ -115,30 +117,37 @@ instance Eq PathInfo where
 instance Ord PathInfo where 
     compare a b = compare (cost a) (cost b) 
 
-cRoute :: Msat -> PathInfo -> [Route] 
-cRoute a c | a > neck c = [] 
-cRoute a c = foldr (c3 a) [] $ path $ c 
 
-c3 :: Msat -> Channel -> [Route] -> [Route] 
-c3 a c r = Route 
-    (destination c) 
-    ((short_channel_id::Channel->String) c)
-    (getDirect (source c) (destination c))
+cRoute :: Msat -> PathInfo -> [Route] 
+cRoute a c | a > neck c = []  
+cRoute a c = foldr (c3 a) [] $ pairUp $ path c 
+
+pairUp :: [Channel] -> [(Channel,Channel)] 
+pairUp [] = [] 
+pairUp (a:[]) = [(a,a)] 
+pairUp (a:b) = (a,head b) : pairUp b
+
+-- this seems to give correct but im confuse
+c3 :: Msat -> (Channel, Channel)  -> [Route] -> [Route] 
+c3 a (cp, c)  r = Route 
+    (destination cp) 
+    ((short_channel_id::Channel->String) cp)
+    (getDirect (source cp) (destination cp))
     (getAmount a c r)
     (getDelay c r) 
     "tlv" 
     : r 
-    where 
-        getDirect :: String -> String -> Int
-        getDirect a b = if readHex a < readHex b then 0 else 1
 
-        getDelay :: Channel -> [Route] -> Int
-        getDelay e [] = 9
-        getDelay e (r:_) = (delay::Route->Int) r + (delay::Channel->Int) e         
-        
-        getAmount :: Msat -> Channel -> [Route] -> Msat
-        getAmount a e [] = a
-        getAmount a e r = (+)   
-            (maximum $ map (amount_msat::Route->Msat) r)
-            (base_fee_millisatoshi e + ( div (1000000 * a * (fee_per_millionth e)) (1000000*1000000))) 
+getDirect :: String -> String -> Int
+getDirect a b = if readHex a < readHex b then 0 else 1
+
+getDelay :: Channel -> [Route] -> Int
+getDelay e [] = 9
+getDelay e (r:_) = (delay::Route->Int) r + (delay::Channel->Int) e         
+
+getAmount :: Msat -> Channel -> [Route] -> Msat
+getAmount a e [] = a
+getAmount a e r = (+)   
+    (maximum $ map (amount_msat::Route->Msat) r)
+    (base_fee_millisatoshi e + ( div (1000000 * a * (fee_per_millionth e)) (1000000*1000000))) -- off by ONE MSAT!
 

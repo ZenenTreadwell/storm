@@ -84,7 +84,6 @@ data Payment = Payment {
 instance FromJSON Payment
 
 --RPC data
-
 data NewAddr = NewAddr {
     bech32 :: String 
     } deriving (Show, Generic)
