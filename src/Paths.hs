@@ -35,85 +35,61 @@ instance ToJSON PathInfo where
         , "neck" .= neck p
         , "route" .= cRoute 1000000 p
         ]
-
-logg = System.IO.appendFile "/home/o/Desktop/logy"
-
+-- whole path and zero totals
 initP :: [Channel] -> PathInfo 
 initP p = P (0) (Fee 0 0) maxBound p 
 
-findPaths :: Node -> Node -> IO [PathInfo]
-findPaths n v 
-    | n == v = pure [] 
-findPaths n v = do 
-    gra <- readIORef graphRef 
-    case (match n gra, 
-          match v gra) of 
-              ( (Just (_, _, _, outy), g) ,
-                (Just (inny, _,_,_) , _ )   ) -> do
-                    -- XXX n*m over lesp too slow
-                    pure $ sort 
-                         $ map (\s -> foldr c2 (initP s) s)  
-                         $ map (\(f, l, x) -> [f] ++ (lp (unLPath l)) ++ [x]) 
-                         $ concat  
-                         $ map (\(x,f) -> map (\o -> (fst o , f (snd o), x)) outy )
-                         $ map (\j -> (fst j , flip3 lesp g (snd j))) inny
-              otherwise -> pure []
-
-bftFindV1 :: Node -> Node -> IO [PathInfo]
-bftFindV1 n v = do 
-    g <- readIORef graphRef
-    case (match n g) of 
-        (Just (_, _, _, outy), g) -> do 
-            pure 
-            $ sort    
-            $ map (\s -> foldr c2 (initP s) s)  
-            $ map (\(f,p) -> [f] <> ( (reverse.lp.unLPath) p) ) 
-            $ map (\(c, n') -> (c, getLPath n' rtree)) outy  
-            where 
-                rtree = lbft v g 
-        otherwise -> pure []    
-
--- possibly too slow, if want multi bft trees should do manually? 
+-- tree per out channel 
 bftFindPaths :: Node -> Node -> IO [PathInfo]
 bftFindPaths n v = do 
     gra <- readIORef graphRef
     case ( match n gra                ,  match v gra) of 
-        ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> do 
-            pure
-            $ sort    
-            -- uncurried helps me follow the types but 
-            $ map (\s -> foldr c2 (initP s) s)  
-            $ map (\(f,p, e) -> [f] <> ( (lp.unLPath) p) <> [e] ) 
-            $ filter (\(_,p,_)-> (length.unLPath) p > 0)
-            $ concat
-            $ map (\(e, v') -> map (\(f,t) -> (f, getLPath v' t, e)) rtrees) inny2  
-            where 
-                rtrees = map (\(f, n') -> (f, lbft n' g)) outy2
-                -- direct channel broke it ? 
-                outy2 = filter (\(f, n') -> v /= n') outy
-                inny2 = filter (\(f, n') -> n /= n') inny
+        ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> 
+            bftFP g inny2 outy2 
+            where outy2 = filter (\(f, n') -> v /= n') outy
+                  inny2 = filter (\(f, n') -> n /= n') inny
         otherwise -> pure []    
 
--- get channels, throw out top
+bftFP :: Gra -> Adj Channel -> Adj Channel -> IO [PathInfo]
+bftFP g inny outy = pure
+    $ map summarizePath   
+    $ map repackPath
+    $ filter (\(_,p,_)-> (length.unLPath) p  > 0)
+    $ map (\(a,pf,b) -> (a, pf g, b) )
+    $ concat
+    $ map (finPaths inny) 
+    $ map outTree outy
+
+-- lol refactor to make it more readable failed greatly
+finPaths :: Adj Channel -> (Channel, Gra -> LRTree Channel) -> [ (Channel, Gra -> LPath Channel, Channel) ] 
+finPaths i outT = map (fp outT) i
+fp :: (Channel, Gra -> LRTree Channel) -> (Channel,Node) -> (Channel, Gra -> LPath Channel, Channel)
+fp (f, t) (e, v) = (f, (getLPath v).t , e) 
+
+outTree :: (Channel, Node) -> (Channel, Gra -> LRTree Channel) 
+outTree o = (fst o, lbft $ snd o)   
+
+repackPath :: (Channel, LPath Channel, Channel) -> [Channel]
+repackPath (f,p,e) = [f] <> ((lp.unLPath) p) <> [e]
 lp :: [LNode Channel] -> [Channel]
 lp [] = [] 
-lp (p:px) = map snd px  
+lp (p:px) = map snd px -- top channel lesp not in path
 
+summarizePath :: [Channel] -> PathInfo
+summarizePath s = foldr c2 (initP s) s
 c2 :: Channel -> PathInfo -> PathInfo 
 c2 e c = P
     (hops c + 1)
-    (Fee
-        ( (base.cost) c + base_fee_millisatoshi e )
-        ( ((hops c + 1)*((ppm.cost) c) + fee_per_millionth e ) `div` (hops c + 2) ))
+    (Fee ( (base.cost) c + base_fee_millisatoshi e )
+         ( ((hops c + 1)*((ppm.cost) c) + fee_per_millionth e ) `div` (hops c + 2) ))
     (min (neck c) ((amount_msat::Channel->Msat) e ) )
     (path c)
 
+-- enable sort (by feerate) for [PathInfo]  
 instance Ord Fee where 
     compare a b = compare (base a + ppm a) (base b + ppm b)
-
 instance Eq PathInfo where 
     (==) a b = (base.cost $ a) == (base.cost $ b) && (ppm.cost $ a) == (ppm.cost $ b)
-
 instance Ord PathInfo where 
     compare a b = compare (cost a) (cost b) 
 
@@ -121,13 +97,10 @@ instance Ord PathInfo where
 cRoute :: Msat -> PathInfo -> [Route] 
 cRoute a c | a > neck c = []  
 cRoute a c = foldr (c3 a) [] $ pairUp $ path c 
-
 pairUp :: [Channel] -> [(Channel,Channel)] 
 pairUp [] = [] 
 pairUp (a:[]) = [(a,a)] 
 pairUp (a:b) = (a,head b) : pairUp b
-
--- this seems to give correct but im confuse
 c3 :: Msat -> (Channel, Channel)  -> [Route] -> [Route] 
 c3 a (cp, c)  r = Route 
     (destination cp) 
@@ -137,17 +110,15 @@ c3 a (cp, c)  r = Route
     (getDelay c r) 
     "tlv" 
     : r 
-
 getDirect :: String -> String -> Int
 getDirect a b = if readHex a < readHex b then 0 else 1
-
 getDelay :: Channel -> [Route] -> Int
 getDelay e [] = 9
 getDelay e (r:_) = (delay::Route->Int) r + (delay::Channel->Int) e         
-
 getAmount :: Msat -> Channel -> [Route] -> Msat
 getAmount a e [] = a
 getAmount a e r = (+)   
     (maximum $ map (amount_msat::Route->Msat) r)
     (base_fee_millisatoshi e + ( div (1000000 * a * (fee_per_millionth e)) (1000000*1000000))) -- off by ONE MSAT!
 
+logg = System.IO.appendFile "/home/o/Desktop/logy"

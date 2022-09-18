@@ -113,7 +113,7 @@ hooks i m p =
 
     -- GRAPH 
     "stormload" -> do 
-          liftIO $ loadGraph   
+          liftIO loadGraph   
           g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [
                 "nodes loaded" .= order g 
@@ -128,7 +128,9 @@ hooks i m p =
     "stormcomponents" -> do 
           g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [ "components" .= map length (components g) ]) i
-    "stormnode" -> rc
+    "stormnode" -> do 
+          paths <- liftIO rebalance 
+          lift $ yield $ Res (toJSON paths) i
     "stormpaths" -> do 
           paths <- liftIO $ bftFindPaths x y  
           lift $ yield $ Res (toJSON paths) i 
