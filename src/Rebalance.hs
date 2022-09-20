@@ -6,21 +6,21 @@
 #-}
 
 module Rebalance where 
-
+import System.IO 
 import GHC.IORef
 import Data.Graph.Inductive.Graph
 import Data.Ratio
 import Data.List 
 import Data.Maybe
-
 import Lightningd
 import Cli
 import Graph
 import Paths
 import Jspec
 
+logg m = System.IO.appendFile "/home/o/Desktop/logy" $ m <> "\n"
 
-rebalance :: IO [PathInfo] 
+rebalance :: IO ()  
 rebalance = (listfunds) >>= \case 
     (Just (Correct (Res funds _))) -> getinfo >>= \case 
         (Just (Correct (Res info  _))) -> do 
@@ -31,17 +31,50 @@ rebalance = (listfunds) >>= \case
                         (a,b,_,d,e) <- pure $ pots 
                                             $ filter (isJust.sci) 
                                             $ chlf wallet
-                        (outy', inny') <- pure (matchChannels outy e, 
-                                                matchChannels inny a)
-                        bftFP g' inny' outy'
-                    otherwise -> pure [] 
-                otherwise -> pure [] 
-    otherwise -> pure []  
+                        p <- bftFP g' (matchChannels inny e) (matchChannels outy a) 
+                        tryRebalance 1000 p 
+                    otherwise -> pure () 
+                otherwise -> pure () 
+    otherwise -> pure ()  
 
+tryRebalance :: Msat -> [PathInfo] -> IO () 
+tryRebalance _ [] = pure ()
+tryRebalance z _ | z <= 0 = pure ()
+tryRebalance z (p:px) =
+    let  
+        f = head.path $ p
+        e = last.path $ p
+        sf = camt f
+        se = camt e
+        amt = min (div (min sf se) 3 ) (neck p `div` 2)
+        r = cRoute amt p 
+        samt = ramt.head $ r
+        eamt = ramt.last $ r 
+        fee = samt - eamt 
+    in do 
+        logg $ "attempting to move " <> (show amt) <> " with fee " <> (show fee) <> "msat" 
+        payto <- b11invoice eamt "test" "t" 
+        case payto of 
+            (Just (Correct (Res invo  _))) -> do
+                logg $ ((bolt11::Invoice->String) invo) 
+                tryRebalance (z-fee) px
+                payy <- sendpay r ((payment_hash::Invoice->String) invo) ((bolt11::Invoice->String) invo)  
+                case payy of 
+                    (Just (Correct (Res povo  _))) -> do 
+                        logg povo 
+                        pure () 
+                    (Just x) -> do 
+                        logg $ show x
+                        pure () 
+                    otherwise -> pure () 
+            otherwise -> pure () 
+                           
+
+                        
 
 
 matchChannels :: Adj Channel -> A -> Adj Channel 
-matchChannels adj cx = filter ((flip elem cx).cci.fst) adj
+matchChannels adj cx = take 2 $ filter ((flip elem cx).cci.fst) adj
 
 pots :: [LFChannel] -> (A,A,A,A,A)
 pots a = foldr p2 ([],[],[],[],[]) $ map ratiod a
@@ -61,10 +94,14 @@ ratiod lfc = (
     , our_amount_msat lfc % (amount_msat::LFChannel->Msat) lfc 
     ) 
 
--- DuplicateRecordFields requires even if arg type is known :(
+-- DuplicateRecordFields requires :(
 sci :: LFChannel -> Maybe String 
 sci = short_channel_id 
 cci :: Channel -> String
-cci = short_channel_id 
+cci = short_channel_id
+camt :: Channel -> Msat 
+camt = amount_msat 
+ramt :: Route -> Msat 
+ramt = amount_msat 
 chlf :: ListFunds->[LFChannel]
 chlf = channels 

@@ -41,7 +41,10 @@ toLNode :: NodeInfo -> LNode NodeInfo
 toLNode ni = ( (getNodeInt.nodeid) ni , ni)
 
 toLEdge' :: Channel -> LEdge Channel
-toLEdge' c = ( (getNodeInt.source) c  , (getNodeInt.destination) c, c )
+toLEdge' c = (
+      (getNodeInt.source) c
+    , (getNodeInt.(destination::Channel->String)) c
+    , c )
 
 --- XXX
 --- hangs on re-call, why?
@@ -77,3 +80,5 @@ deadends c =
         then Nothing 
         else Just c
 
+destiny :: Channel -> String 
+destiny = destination

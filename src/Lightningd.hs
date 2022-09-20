@@ -4,9 +4,7 @@
     DeriveGeneric, 
     DuplicateRecordFields
 #-} 
-
 module Lightningd where
-
 import GHC.Generics
 import Data.Aeson
 import Data.Aeson.Types 
@@ -89,7 +87,6 @@ data NewAddr = NewAddr {
     } deriving (Show, Generic)
 instance FromJSON NewAddr
 
-
 data Invoice = Invoice {
       payment_hash :: String
     , expires_at :: Int
@@ -120,6 +117,37 @@ instance FromJSON GetInfo where
     parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = map repl . dropWhile (=='_')} v
 repl '5' = '-'
 repl o = o
+
+
+data SendPay = SendPay {
+      _____id :: String 
+    , payment_hash :: String 
+    , status :: String 
+    , created_at :: Int 
+    , amount_sent_msat :: Msat 
+    , groupid :: Maybe Int
+    , amount_msat :: Maybe Msat 
+    , destination :: Maybe String 
+    , completed_at :: Maybe Int 
+    , label :: Maybe String 
+    , partid :: Maybe Int 
+    , bolt11 :: Maybe String 
+    , bolt12 :: Maybe String    
+    } deriving (Generic, Show) 
+instance FromJSON SendPay where 
+    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
+
+data SetChannel = SetChannel {
+      peer_id :: String 
+    , channel_id :: String 
+    , fee_base_msat :: Msat 
+    , fee_proportional_millionths :: Int 
+    , minimum_htlc_out_msat :: Msat 
+    , short_channel_id :: Maybe String 
+    --, warning_htlcmin_too_low -- ?
+    -- warning_htlcmax_too_high
+    } deriving (Generic, Show)
+instance FromJSON SetChannel  
 
 data Features = Features {
       __init :: String

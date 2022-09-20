@@ -4,9 +4,7 @@
     DeriveGeneric, 
     OverloadedStrings
 #-}
-
 module Paths where 
-
 import Lightningd
 import Cli
 import Graph
@@ -33,13 +31,11 @@ instance ToJSON PathInfo where
           "hops" .= hops p
         , "cost" .= cost p
         , "neck" .= neck p
-        , "route" .= cRoute 1000000 p
+        , "route" .= cRoute 1000000000 p
         ]
--- whole path and zero totals
 initP :: [Channel] -> PathInfo 
 initP p = P (0) (Fee 0 0) maxBound p 
 
--- tree per out channel 
 bftFindPaths :: Node -> Node -> IO [PathInfo]
 bftFindPaths n v = do 
     gra <- readIORef graphRef
@@ -52,6 +48,7 @@ bftFindPaths n v = do
 
 bftFP :: Gra -> Adj Channel -> Adj Channel -> IO [PathInfo]
 bftFP g inny outy = pure
+    $ sort
     $ map summarizePath   
     $ map repackPath
     $ filter (\(_,p,_)-> (length.unLPath) p  > 0)
@@ -60,7 +57,6 @@ bftFP g inny outy = pure
     $ map (finPaths inny) 
     $ map outTree outy
 
--- lol refactor to make it more readable failed greatly
 finPaths :: Adj Channel -> (Channel, Gra -> LRTree Channel) -> [ (Channel, Gra -> LPath Channel, Channel) ] 
 finPaths i outT = map (fp outT) i
 fp :: (Channel, Gra -> LRTree Channel) -> (Channel,Node) -> (Channel, Gra -> LPath Channel, Channel)
@@ -73,26 +69,24 @@ repackPath :: (Channel, LPath Channel, Channel) -> [Channel]
 repackPath (f,p,e) = [f] <> ((lp.unLPath) p) <> [e]
 lp :: [LNode Channel] -> [Channel]
 lp [] = [] 
-lp (p:px) = map snd px -- top channel lesp not in path
+lp (p:px) = map snd px
 
 summarizePath :: [Channel] -> PathInfo
-summarizePath s = foldr c2 (initP s) s
+summarizePath s@(_:sx) = foldr c2 (initP s) sx
 c2 :: Channel -> PathInfo -> PathInfo 
 c2 e c = P
     (hops c + 1)
     (Fee ( (base.cost) c + base_fee_millisatoshi e )
-         ( ((hops c + 1)*((ppm.cost) c) + fee_per_millionth e ) `div` (hops c + 2) ))
+         ( ((hops c)*((ppm.cost) c) + fee_per_millionth e ) `div` (hops c + 1) ))
     (min (neck c) ((amount_msat::Channel->Msat) e ) )
     (path c)
 
--- enable sort (by feerate) for [PathInfo]  
 instance Ord Fee where 
     compare a b = compare (base a + ppm a) (base b + ppm b)
 instance Eq PathInfo where 
     (==) a b = (base.cost $ a) == (base.cost $ b) && (ppm.cost $ a) == (ppm.cost $ b)
 instance Ord PathInfo where 
     compare a b = compare (cost a) (cost b) 
-
 
 cRoute :: Msat -> PathInfo -> [Route] 
 cRoute a c | a > neck c = []  
@@ -103,9 +97,9 @@ pairUp (a:[]) = [(a,a)]
 pairUp (a:b) = (a,head b) : pairUp b
 c3 :: Msat -> (Channel, Channel)  -> [Route] -> [Route] 
 c3 a (cp, c)  r = Route 
-    (destination cp) 
+    ((destination::Channel->String) cp) 
     ((short_channel_id::Channel->String) cp)
-    (getDirect (source cp) (destination cp))
+    (getDirect (source cp) ((destination::Channel->String) cp))
     (getAmount a c r)
     (getDelay c r) 
     "tlv" 
@@ -117,8 +111,6 @@ getDelay e [] = 9
 getDelay e (r:_) = (delay::Route->Int) r + (delay::Channel->Int) e         
 getAmount :: Msat -> Channel -> [Route] -> Msat
 getAmount a e [] = a
-getAmount a e r = (+)   
+getAmount a e r = (+)
     (maximum $ map (amount_msat::Route->Msat) r)
-    (base_fee_millisatoshi e + ( div (1000000 * a * (fee_per_millionth e)) (1000000*1000000))) -- off by ONE MSAT!
-
-logg = System.IO.appendFile "/home/o/Desktop/logy"
+    (base_fee_millisatoshi e + ( div (1000000 * a * (fee_per_millionth e)) (1000000*1000000)))

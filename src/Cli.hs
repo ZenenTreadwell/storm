@@ -1,4 +1,4 @@
-{-# LANGUAGE 
+{-# LANGUAGE
       LambdaCase
     , OverloadedStrings
     , DeriveGeneric
@@ -65,9 +65,37 @@ reqToHandle a =
 newaddr :: Cln NewAddr 
 newaddr = do 
     i <- tick 
-    reqToHandle $ Req ("newaddr"::Text) (object []) (Just $ i )
+    reqToHandle $ Req ("newaddr"::Text) (object []) (Just i )
     getRes
 
+b11invoice ::  Msat -> String -> String -> Cln Invoice 
+b11invoice a l d = do 
+    i <- tick 
+    reqToHandle $ Req ("invoice"::Text) (object [
+          "amount_msat" .= a 
+        , "label" .= (l <> (show i) )
+        , "description" .= (d <> (show i)) ]) (Just i) 
+    getRes
+
+--sendpay :: [Route] -> String -> Cln SendPay 
+sendpay r h v = do 
+    i <- tick 
+    reqToHandle $ Req ("sendpay"::Text) (object [
+          "route" .= r
+        , "payment_hash" .=  h
+        , "bolt11" .= v  
+        ]) (Just i) 
+    getRes
+
+setchannel :: String -> Int -> Int -> Cln SetChannel 
+setchannel n b p = do 
+    i <- tick 
+    reqToHandle $ Req ("sendpay"::Text) (object [
+          "id" .= n
+        , "feebase" .= b
+        , "feeppm" .= p 
+        ]) (Just i) 
+    getRes
 
 getinfo :: Cln GetInfo 
 getinfo = do 
