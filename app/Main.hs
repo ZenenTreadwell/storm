@@ -1,6 +1,6 @@
 module Main where
-import Cln.Conduit (inConduit)
 import Plugin (plug)
+import Cln.Conduit (inConduit)
 import Control.Monad (forever)
 import System.IO
 import Data.Conduit.Combinators (sourceHandle, sinkHandle)

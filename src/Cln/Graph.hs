@@ -51,7 +51,7 @@ loadGraph = (allchannels) >>= \case
     (Just (Correct (Res listchannels _))) -> (allnodes) >>= \case 
         (Just (Correct (Res listnodes _))) -> do 
             liftIO $ writeIORef graphRef
-    
+                   $ (\g -> (flip subgraph g) . head $ components g )
                    $ gfiltermap traps
                    $ mkGraph (map toLNode nx) (map toLEdge' cx)
                    where cx = (channels::ListChannels->[Channel]) listchannels 
