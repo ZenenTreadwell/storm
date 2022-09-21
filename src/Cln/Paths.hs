@@ -4,10 +4,10 @@
     DeriveGeneric, 
     OverloadedStrings
 #-}
-module Paths where 
-import Lightningd
-import Cli
-import Graph
+module Cln.Paths where 
+import Cln.Types 
+import Cln.Client
+import Cln.Graph
 import System.IO
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.Query
@@ -33,6 +33,11 @@ instance ToJSON PathInfo where
         , "neck" .= neck p
         , "route" .= cRoute 1000000000 p
         ]
+
+cRoute :: Msat -> PathInfo -> [Route] 
+cRoute a c | a > neck c = []  
+cRoute a c = foldr (c3 a) [] $ pairUp $ path c 
+
 initP :: [Channel] -> PathInfo 
 initP p = P (0) (Fee 0 0) maxBound p 
 
@@ -41,18 +46,18 @@ bftFindPaths n v = do
     gra <- readIORef graphRef
     case ( match n gra                ,  match v gra) of 
         ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> 
-            bftFP g inny2 outy2 
-            where outy2 = filter (\(f, n') -> v /= n') outy
-                  inny2 = filter (\(f, n') -> n /= n') inny
+            bftFP g oo ii
+            where oo = filter (\(f, n') -> v /= n') outy
+                  ii = filter (\(f, n') -> n /= n') inny
         otherwise -> pure []    
 
 bftFP :: Gra -> Adj Channel -> Adj Channel -> IO [PathInfo]
-bftFP g inny outy = pure
+bftFP g outy inny = pure
     $ sort
     $ map summarizePath   
     $ map repackPath
-    $ filter (\(_,p,_)-> (length.unLPath) p  > 0)
-    $ map (\(a,pf,b) -> (a, pf g, b) )
+    $ filter (\(_,p,_)-> (length.unLPath) p > 0)
+    $ map (\(a,pf,b) -> (a,pf g, b) )
     $ concat
     $ map (finPaths inny) 
     $ map outTree outy
@@ -88,9 +93,6 @@ instance Eq PathInfo where
 instance Ord PathInfo where 
     compare a b = compare (cost a) (cost b) 
 
-cRoute :: Msat -> PathInfo -> [Route] 
-cRoute a c | a > neck c = []  
-cRoute a c = foldr (c3 a) [] $ pairUp $ path c 
 pairUp :: [Channel] -> [(Channel,Channel)] 
 pairUp [] = [] 
 pairUp (a:[]) = [(a,a)] 

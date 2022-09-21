@@ -9,7 +9,7 @@
  #-}
 
 -- prior art https://hackage.haskell.org/package/jsonrpc-conduit-0.2.5
-module Jspec where 
+module Cln.Conduit where 
 
 import GHC.Generics
 import Data.Text (Text)
@@ -23,8 +23,8 @@ import qualified Data.ByteString as S
 import Data.Conduit 
 import Data.Attoparsec.ByteString
 
-jinjin :: (FromJSON a) => ConduitT S.ByteString (Fin a) IO ()
-jinjin = evalStateT l Nothing
+inConduit :: (FromJSON a) => ConduitT S.ByteString (Fin a) IO ()
+inConduit = evalStateT l Nothing
     where 
     l = lift await >>= maybe (lift mempty) (r >=> h)
     r i = get  >>= \case

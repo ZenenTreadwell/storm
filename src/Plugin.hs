@@ -5,13 +5,13 @@
 #-}
 module Plugin where 
 
-import Jspec
-import Manifest (manifest) 
-import Lightningd 
-import Cli
-import Graph 
-import Paths
 import Rebalance
+import Cln.Conduit
+import Cln.Manifest (manifest) 
+import Cln.Types 
+import Cln.Client 
+import Cln.Graph 
+import Cln.Paths
 import System.IO
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class 

@@ -4,7 +4,7 @@
     DeriveGeneric, 
     DuplicateRecordFields
 #-} 
-module Lightningd where
+module Cln.Types where
 import GHC.Generics
 import Data.Aeson
 import Data.Aeson.Types 
@@ -122,7 +122,7 @@ repl o = o
 data SendPay = SendPay {
       _____id :: String 
     , payment_hash :: String 
-    , status :: String 
+    , __status :: String 
     , created_at :: Int 
     , amount_sent_msat :: Msat 
     , groupid :: Maybe Int
@@ -132,10 +132,16 @@ data SendPay = SendPay {
     , label :: Maybe String 
     , partid :: Maybe Int 
     , bolt11 :: Maybe String 
-    , bolt12 :: Maybe String    
+    , bolt12 :: Maybe String 
+    , payment_preimage :: Maybe String 
     } deriving (Generic, Show) 
 instance FromJSON SendPay where 
-    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
+    parseJSON v = genericParseJSON defaultOptions{
+          omitNothingFields = True
+        , fieldLabelModifier = dropWhile (=='_')} v
+instance ToJSON SendPay where
+    toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
+
 
 data SetChannel = SetChannel {
       peer_id :: String 

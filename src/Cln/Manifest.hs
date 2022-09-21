@@ -4,7 +4,7 @@
     , DeriveGeneric
  #-}                 
 
-module Manifest (manifest) where 
+module Cln.Manifest (manifest) where 
 import GHC.Generics
 import Data.Text (Text) 
 import Data.Aeson 

@@ -5,11 +5,11 @@
     DeriveGeneric, 
     OverloadedStrings
 #-}
-module Graph where 
+module Cln.Graph where 
 
-import Lightningd 
-import Cli
-import Jspec
+import Cln.Types 
+import Cln.Client
+import Cln.Conduit
 import Data.Aeson 
 import Control.Monad
 import System.IO 
@@ -46,21 +46,19 @@ toLEdge' c = (
     , (getNodeInt.(destination::Channel->String)) c
     , c )
 
---- XXX
---- hangs on re-call, why?
 loadGraph :: IO ()
 loadGraph = (allchannels) >>= \case 
     (Just (Correct (Res listchannels _))) -> (allnodes) >>= \case 
         (Just (Correct (Res listnodes _))) -> do 
             liftIO $ writeIORef graphRef
-                   $ gfiltermap deadends
+    
+                   $ gfiltermap traps
                    $ mkGraph (map toLNode nx) (map toLEdge' cx)
                    where cx = (channels::ListChannels->[Channel]) listchannels 
                          nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
         otherwise -> pure () 
     otherwise -> pure () 
 
---- seems like it could be faster
 capacity :: Gra -> Sat -> Sat
 capacity g a 
     | isEmpty g = a 
@@ -72,8 +70,8 @@ capacity g a
                 (((short_channel_id::Channel->String).fst) y)  ) 
             $ lneighbors' c) 
 
-deadends :: Cxt -> Maybe Cxt  
-deadends c =
+traps :: Cxt -> Maybe Cxt  
+traps c =
     let inny = (indeg' c) == 0 
         outy = (outdeg' c) == 0
     in if (inny || outy)   

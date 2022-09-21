@@ -21,6 +21,7 @@ description: test
 
 dependencies:
 - base >= 4.7 && < 5
+- random
 - aeson 
 - lens
 - lens-aeson

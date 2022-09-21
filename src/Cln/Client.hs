@@ -6,10 +6,10 @@
     , GeneralizedNewtypeDeriving
 #-}
 
-module Cli where 
+module Cln.Client where 
 
-import Jspec
-import Lightningd
+import Cln.Conduit
+import Cln.Types
 import System.IO
 import System.IO.Unsafe
 import GHC.IO.IOMode
@@ -41,7 +41,7 @@ idref :: IORef Int
 idref = unsafePerformIO $ newIORef (1 :: Int) 
 
 clnref :: IORef Handle 
-clnref = unsafePerformIO $ newIORef stderr -- stderr is a placeholder until init calls conectCln
+clnref = unsafePerformIO $ newIORef stderr
 
 connectCln :: String -> IO ()
 connectCln d = (socket AF_UNIX Stream 0) >>= \soc -> do 
@@ -52,7 +52,7 @@ connectCln d = (socket AF_UNIX Stream 0) >>= \soc -> do
 getRes :: FromJSON a => IO (Maybe (Fin a))
 getRes = (readIORef clnref) >>= \h -> runConduit $
     sourceHandle h .| 
-    jinjin         .|
+    inConduit      .|
     await >>= pure
 
 reqToHandle :: ToJSON a => a -> IO ()
@@ -77,13 +77,13 @@ b11invoice a l d = do
         , "description" .= (d <> (show i)) ]) (Just i) 
     getRes
 
---sendpay :: [Route] -> String -> Cln SendPay 
+sendpay :: [Route] -> String -> String -> Cln SendPay 
 sendpay r h v = do 
     i <- tick 
     reqToHandle $ Req ("sendpay"::Text) (object [
           "route" .= r
         , "payment_hash" .=  h
-        , "bolt11" .= v  
+        , "payment_secret" .= v  
         ]) (Just i) 
     getRes
 
