@@ -61,7 +61,7 @@ reqToHandle a =
     in do 
         L.appendFile "/home/o/Desktop/logy" $ encoded <> "\n"
         (readIORef clnref) >>= \h -> L.hPutStr h encoded 
-
+---
 newaddr :: Cln NewAddr 
 newaddr = do 
     i <- tick 
@@ -83,8 +83,23 @@ sendpay r h v = do
     reqToHandle $ Req ("sendpay"::Text) (object [
           "route" .= r
         , "payment_hash" .=  h
-        , "payment_secret" .= v  
+        , "payment_secret" .= v
         ]) (Just i) 
+    getRes
+
+listsendpays :: String -> Cln ListSendPays 
+listsendpays h = do 
+    i <- tick 
+    reqToHandle $ Req ("listsendpays"::Text) (object [
+        "payment_hash" .=  h ])  (Just i) 
+    getRes
+
+waitsendpay :: String -> Cln WaitSendPay 
+waitsendpay h = do 
+    i <- tick 
+    reqToHandle $ Req ("waitsendpay"::Text) (object [
+          "payment_hash" .=  h 
+        , "timeout" .= (33 :: Int)  ])  (Just i) 
     getRes
 
 setchannel :: String -> Int -> Int -> Cln SetChannel 
@@ -132,6 +147,13 @@ allnodes = do
     i <- tick
     reqToHandle $ Req ("listnodes"::Text) (object []) (Just $ i)     
     getRes 
+
+allforwards :: Cln ListForwards
+allforwards = do 
+    i <- tick 
+    reqToHandle $ Req ("listforwards"::Text) (object [
+        "status" .= ("settled"::Text) ]) (Just i )
+    getRes
 
 listfunds :: Cln ListFunds
 listfunds = do 

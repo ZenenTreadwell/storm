@@ -1,5 +1,5 @@
 module Main where
-import Plugin (plug)
+import Cln.Plugin (plug)
 import Cln.Conduit (inConduit)
 import Control.Monad (forever)
 import System.IO

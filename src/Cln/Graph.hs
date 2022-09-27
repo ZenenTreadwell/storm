@@ -6,7 +6,6 @@
     OverloadedStrings
 #-}
 module Cln.Graph where 
-
 import Cln.Types 
 import Cln.Client
 import Cln.Conduit
@@ -25,12 +24,26 @@ import Data.List
 import Data.Maybe 
 import Data.Char
 import Numeric 
+type Gra = Gr NodeInfo Channel
+type Cxt = Context NodeInfo Channel
 
 graphRef :: IORef Gra
 graphRef = unsafePerformIO $ newIORef empty 
 
-type Gra = Gr NodeInfo Channel
-type Cxt = Context NodeInfo Channel
+
+loadGraph :: IO ()
+loadGraph = (allchannels) >>= \case 
+    (Just (Correct (Res listchannels _))) -> (allnodes) >>= \case 
+        (Just (Correct (Res listnodes _))) -> do 
+            liftIO $ writeIORef graphRef
+                   $ (\g -> (flip subgraph g) . head $ components g )
+                   $ (\g -> foldr (delEdge.toEdge) g $ filter (feeTooHigh.edgeLabel) (labEdges g) ) 
+                   $ gfiltermap traps
+                   $ mkGraph (map toLNode nx) (map toLEdge' cx)
+                   where cx = (channels::ListChannels->[Channel]) listchannels 
+                         nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
+        otherwise -> pure () 
+    otherwise -> pure () 
 
 getNodeInt :: String -> Node
 getNodeInt s = case readHex.filter isHexDigit $ s of 
@@ -46,29 +59,10 @@ toLEdge' c = (
     , (getNodeInt.(destination::Channel->String)) c
     , c )
 
-loadGraph :: IO ()
-loadGraph = (allchannels) >>= \case 
-    (Just (Correct (Res listchannels _))) -> (allnodes) >>= \case 
-        (Just (Correct (Res listnodes _))) -> do 
-            liftIO $ writeIORef graphRef
-                   $ (\g -> (flip subgraph g) . head $ components g )
-                   $ gfiltermap traps
-                   $ mkGraph (map toLNode nx) (map toLEdge' cx)
-                   where cx = (channels::ListChannels->[Channel]) listchannels 
-                         nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
-        otherwise -> pure () 
-    otherwise -> pure () 
-
-capacity :: Gra -> Sat -> Sat
-capacity g a 
-    | isEmpty g = a 
-    | otherwise = case matchAny g of 
-        (c, g') -> capacity g' $ a + (sum 
-            $ map ((amount_msat::Channel->Msat).fst) 
-            $ nubBy (\x y -> (==) 
-                (((short_channel_id::Channel->String).fst) x)     
-                (((short_channel_id::Channel->String).fst) y)  ) 
-            $ lneighbors' c) 
+feeTooHigh :: Channel -> Bool 
+feeTooHigh c = (||) 
+    (base_fee_millisatoshi c > 111111) 
+    (fee_per_millionth c > 11111)
 
 traps :: Cxt -> Maybe Cxt  
 traps c =
@@ -78,5 +72,3 @@ traps c =
         then Nothing 
         else Just c
 
-destiny :: Channel -> String 
-destiny = destination

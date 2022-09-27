@@ -23,6 +23,10 @@ import qualified Data.ByteString as S
 import Data.Conduit 
 import Data.Attoparsec.ByteString
 
+type Params = Value
+type Id = Value
+type Method = Text
+
 inConduit :: (FromJSON a) => ConduitT S.ByteString (Fin a) IO ()
 inConduit = evalStateT l Nothing
     where 

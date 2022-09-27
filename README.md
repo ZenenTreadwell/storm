@@ -1,34 +1,21 @@
-######Haskell Stack Storm
+######storm - cln plugin
 `stack init`
 `stack build`
 
-Executable **storm** cln plugin. See
-- src/Manifest.hs - config
+Executable **storm** 
 https://lightning.readthedocs.io/PLUGINS.html
 
-- src/Cli.hs 
-It works in ghci: 
+Library ghci: 
+    `\> :l Cln.Client`
     `\> connectCln "<rpc-file-path>" `
     `\> getinfo`
-- src/Graph.hs - graph object using fgl
-- src/Paths.hs 
 
-command line example : 
-- $ lightning-cli stormwallet 
-- $ lightning-cli stormload -- prerec to below, loads several GB into memory
-- $ lightning-cli stormpaths [node] [node2]
-- $ lightning-cli stormcomponants
-- $ lightning-cli stormsize
-
-Working on:
-- channel candidates
-- balancer 
-- better paths
-- feeadjuster
-- hold invoices
-- microinteractions 
-- paths explorer 
-- 
+Interface (i.e $ lightning-cli stormwallet)  
+- stormwallet 
+- stormnetwork
+- stormpaths fromid toid
+  
+Autopilot
 
 {
 "id": "0337694505123a12a8fadd95523dcc235898ad3b80a06e4a63ca26fed68dd0d17c",

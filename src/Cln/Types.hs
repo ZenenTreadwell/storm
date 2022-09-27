@@ -11,7 +11,7 @@ import Data.Aeson.Types
 
 type Sat = Int 
 type Msat = Int
-data Short = Short { 
+data Short = Short {
       block :: Int
     , input  :: Int 
     , output :: Int
@@ -24,7 +24,7 @@ instance ToJSON Fee
 
 --Subscription data
 data BalanceSnapshot = BalanceSnapshot { 
-    balance_snapshots :: [Snapshot]
+      balance_snapshots :: [Snapshot]
     } deriving (Generic, Show) 
 instance FromJSON BalanceSnapshot 
 
@@ -32,7 +32,8 @@ data Snapshot = Snapshot {
       node_id :: String
     , blockheight :: Int 
     , timestamp :: Int 
-    , accounts :: Saccount } deriving (Show, Generic)
+    , accounts :: Saccount 
+    } deriving (Show, Generic)
 instance FromJSON Snapshot 
 
 data Saccount = Saccount {
@@ -120,20 +121,21 @@ repl o = o
 
 
 data SendPay = SendPay {
-      _____id :: String 
+      message :: Maybe String
+    , _____id :: Int 
     , payment_hash :: String 
-    , __status :: String 
-    , created_at :: Int 
-    , amount_sent_msat :: Msat 
     , groupid :: Maybe Int
-    , amount_msat :: Maybe Msat 
     , destination :: Maybe String 
-    , completed_at :: Maybe Int 
+    , amount_msat :: Maybe Msat 
+    , amount_sent_msat :: Msat 
+    , created_at :: Int 
+    , status :: String 
     , label :: Maybe String 
     , partid :: Maybe Int 
     , bolt11 :: Maybe String 
     , bolt12 :: Maybe String 
     , payment_preimage :: Maybe String 
+    , completed_at :: Maybe Int 
     } deriving (Generic, Show) 
 instance FromJSON SendPay where 
     parseJSON v = genericParseJSON defaultOptions{
@@ -142,6 +144,86 @@ instance FromJSON SendPay where
 instance ToJSON SendPay where
     toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
 
+
+data WaitSendPay = WaitSendPay {
+      ___id :: Maybe Int 
+    , payment_hash :: Maybe String 
+    , status :: Maybe String 
+    , created_at :: Maybe Int
+    , amount_send_msat :: Maybe Msat 
+    , groupid :: Maybe Int 
+    , amount_msat :: Maybe Msat 
+    , destination :: Maybe String 
+    , completed_at :: Maybe Int
+    , label :: Maybe String
+    , partid :: Maybe Int 
+    , bolt11 :: Maybe String 
+    , bolt12 :: Maybe String  
+    , payment_preimage :: Maybe String 
+    , code :: Maybe Int 
+    , message :: Maybe String 
+    , __data :: Maybe FailSP  
+    } deriving (Generic, Show) 
+instance FromJSON WaitSendPay where 
+    parseJSON v = genericParseJSON defaultOptions{
+          omitNothingFields = True
+        , fieldLabelModifier = dropWhile (=='_')} v
+instance ToJSON WaitSendPay where
+    toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
+
+data FailSP = FailSP {
+      ______id :: Maybe Int 
+    , payment_hash :: Maybe String 
+    , groupid :: Maybe Int
+    , destination :: Maybe String 
+    , amount_msat :: Maybe Msat 
+    , created_at :: Maybe Int
+    , status :: Maybe String 
+    , erring_index :: Maybe Int 
+    , failcode :: Maybe Int 
+    , failcodename :: Maybe String 
+    , erring_node :: Maybe String 
+    , erring_channel :: Maybe String 
+    , erring_direction :: Maybe Int 
+    , raw_message :: Maybe String 
+    } deriving (Generic, Show) 
+instance FromJSON FailSP where 
+    parseJSON v = genericParseJSON defaultOptions{
+          omitNothingFields = True
+        , fieldLabelModifier = dropWhile (=='_')} v
+instance ToJSON FailSP where
+    toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
+
+
+
+data ListSendPays = ListSendPays {
+    payments :: [SendPays] 
+    } deriving (Generic, Show) 
+instance FromJSON ListSendPays
+instance ToJSON ListSendPays
+
+data SendPays = SendPays {
+      ______id :: Int 
+    , groupid :: Int 
+    , payment_hash :: String 
+    , status :: String 
+    , created_at :: Int
+    , amount_sent_msat :: Msat 
+    , amount_msat :: Maybe Msat 
+    , destination :: Maybe String 
+    , label :: Maybe String 
+    , bolt11 :: Maybe String 
+    , bolt12 :: Maybe String 
+    , description :: Maybe String 
+    , erroronion :: Maybe String 
+    , payment_preimage :: Maybe String 
+    } deriving (Generic, Show)
+instance FromJSON SendPays where 
+    parseJSON v = genericParseJSON defaultOptions{
+          omitNothingFields = True
+        , fieldLabelModifier = dropWhile (=='_')} v
+instance ToJSON SendPays where
+    toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
 
 data SetChannel = SetChannel {
       peer_id :: String 
@@ -193,6 +275,33 @@ instance FromJSON Channel where
           fieldLabelModifier = dropWhile (=='_')
         , omitNothingFields = True } v
 instance ToJSON Channel
+
+data ListForwards = ListForwards {
+    forwards :: [Forward] 
+    }deriving (Show, Generic)
+instance ToJSON ListForwards
+instance FromJSON ListForwards 
+-- incorrect?
+data Forward = Forward {
+      in_channel :: String
+    , in_htlc_id :: Int 
+    , in_msat :: Msat 
+    , status :: String 
+    , received_time :: Int 
+    , out_channel :: Maybe String 
+    , out_htlc_id :: Maybe Int 
+    , style :: String 
+    , fee_msat :: Maybe Msat
+    , out_msat :: Maybe Msat
+    , resolved_time :: Maybe Int 
+    , failcode :: Maybe Int 
+    , failreason :: Maybe String 
+    }deriving (Show, Generic)    
+instance ToJSON Forward
+instance FromJSON Forward where 
+    parseJSON v = genericParseJSON defaultOptions{
+          fieldLabelModifier = dropWhile (=='_')
+        , omitNothingFields = True } v
 
 data ListNodes = ListNodes {
       _nodes :: [NodeInfo]
@@ -254,7 +363,7 @@ data LFOutput = LFOutput {
 instance FromJSON LFOutput where
     parseJSON v = genericParseJSON defaultOptions{
           fieldLabelModifier = dropWhile (=='_')
-        , omitNothingFields = True } v
+        , omitNothingFields = True} v
 instance ToJSON LFOutput
 
 data LFChannel = LFChannel {

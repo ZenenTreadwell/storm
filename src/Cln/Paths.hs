@@ -31,12 +31,12 @@ instance ToJSON PathInfo where
           "hops" .= hops p
         , "cost" .= cost p
         , "neck" .= neck p
-        , "route" .= cRoute 1000000000 p
+        , "route" .= createRoute 1000000000 p
         ]
 
-cRoute :: Msat -> PathInfo -> [Route] 
-cRoute a c | a > neck c = []  
-cRoute a c = foldr (c3 a) [] $ pairUp $ path c 
+createRoute :: Msat -> PathInfo -> [Route] 
+createRoute a c | a > neck c = []  
+createRoute a c = foldr (c3 a) [] $ pairUp $ path c 
 
 initP :: [Channel] -> PathInfo 
 initP p = P (0) (Fee 0 0) maxBound p 
@@ -47,7 +47,7 @@ bftFindPaths n v = do
     case ( match n gra                ,  match v gra) of 
         ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> 
             bftFP g oo ii
-            where oo = filter (\(f, n') -> v /= n') outy
+            where oo = filter (\(f, n') -> v /= n') outy --filter direct channel 
                   ii = filter (\(f, n') -> n /= n') inny
         otherwise -> pure []    
 
@@ -85,6 +85,13 @@ c2 e c = P
          ( ((hops c)*((ppm.cost) c) + fee_per_millionth e ) `div` (hops c + 1) ))
     (min (neck c) ((amount_msat::Channel->Msat) e ) )
     (path c)
+
+getCircles :: Node -> IO [PathInfo]
+getCircles n = do
+    g <- readIORef graphRef
+    case match n g of 
+        (Just (inny, n',z, outy), g') -> bftFP g' outy inny
+        otherwise -> pure [] 
 
 instance Ord Fee where 
     compare a b = compare (base a + ppm a) (base b + ppm b)

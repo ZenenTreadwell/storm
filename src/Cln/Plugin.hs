@@ -1,12 +1,12 @@
 {-# LANGUAGE 
-    LambdaCase
+      LambdaCase
     , OverloadedStrings 
     , DuplicateRecordFields
 #-}
-module Plugin where 
+module Cln.Plugin where 
 
-import Rebalance
 import Cln.Conduit
+import Cln.Balance
 import Cln.Manifest (manifest) 
 import Cln.Types 
 import Cln.Client 
@@ -16,6 +16,7 @@ import System.IO
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class 
 import Control.Monad.Trans.State 
+import Control.Concurrent (threadDelay)
 import GHC.IORef 
 import System.IO.Unsafe
 import Network.Socket
@@ -37,10 +38,6 @@ import Data.List
 import Data.Char 
 import Data.Text.Format.Numbers
 import Numeric
-
-type Method = Text 
-type Params = Value
-type Id = Value
 
 plug :: ConduitT (Fin (Req Value)) S.ByteString IO () 
 plug = a .| b .| c 
@@ -75,7 +72,7 @@ notifications m p = case m of
     "sendpay_success"        -> pure ()    
     "sendpay_failure"        -> pure ()    
     "coin_movement"          -> case ((fromJSON p) :: Result CoinMovement ) of 
-        Success (a)             -> pure () 
+        Success (a)             -> pure () -- recordFwd 
         Error x                 -> pure ()                       
     "balance_snapshot"       -> pure ()
     "openchannel_peer_sigs"  -> pure ()    
@@ -87,8 +84,8 @@ hooks i m p =
   in case m of
     "init" -> do 
           liftIO $ connectCln $ fromInit p
-          rc 
-    "getmanifest" -> lift $ yield $ Res manifest i
+          rc
+    "getmanifest" -> lift $ yield $ Res manifest i 
       
       -- HOOK
     "peer_connected"        -> rc 
@@ -113,23 +110,26 @@ hooks i m p =
 
     -- GRAPH 
     "stormload" -> do 
-          liftIO loadGraph   
+          liftIO loadGraph  
+          liftIO genCircles 
           g <- liftIO $ readIORef graphRef
+          p <- liftIO $ readIORef circleRef  
           lift $ yield $ Res (object [
-                "nodes loaded" .= order g 
+                  "nodes loaded" .= order g
+                , "balancing paths" .= length p
               ]) i
     "stormsize" -> do 
           g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [
                 "nodes" .= order g 
               , "edges" .= size g
-              , "capacity" .= capacity g 0 
-              ]) i
-    "stormcomponents" -> do 
-          g <- liftIO $ readIORef graphRef
-          lift $ yield $ Res (object [ "components" .= map length (components g) ]) i
+              , "capacity" .= (prettyI (Just ',') $ capacity g 0 )
+              , "ze levels" .= (object
+                  $ map (\(l,c)-> (fromString.show $ l) .= c )
+                  $ foldr lvls [] (level (node'.fst.matchAny $ g) g)
+              )]) i
     "stormnode" -> do 
-          paths <- liftIO rebalance 
+          paths <- liftIO $ rebalance 89000
           lift $ yield $ Res (toJSON paths) i
     "stormpaths" -> do 
           paths <- liftIO $ bftFindPaths x y  
@@ -166,15 +166,28 @@ hooks i m p =
                                         (filter ((/= (__state x)).fst) a)  
                             Nothing -> (__state  x, (our_amount_msat :: LFChannel -> Msat) x) : a
 
+
+capacity :: Gra -> Msat -> Msat 
+capacity g t
+    | isEmpty g = t
+    | otherwise = case matchAny g of
+        (n, g') -> capacity g' $ t + ( (sum.(map chamnt).(map fst).lneighbors') n)     
+
 countPots (a,b,c,d,e) = object [
-     "a. depleted" .= length a
-    ,"b. mid-low" .= length b 
+      "a. depleted" .= length a
+    , "b. mid-low" .= length b 
     , "c. balanced" .= length c 
     , "d. mid-high" .= length d
     , "e. full" .= length e  
     ]
+lvls :: (Node, Int) -> [(Int, Int)] -> [(Int, Int)]
+lvls (m, i) q = case lookup i q of 
+    Nothing -> (i, 1) : q 
+    Just x -> (i, x + 1) : filter ((/= i).fst) q 
 
 getNodeArg i v = case v ^? nth i . _String of
     (Just b) -> filter isHexDigit (show b) 
     Nothing -> ""
 
+chamnt :: Channel -> Msat
+chamnt = amount_msat
