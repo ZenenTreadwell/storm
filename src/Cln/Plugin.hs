@@ -82,9 +82,11 @@ notifications m p = case m of
 hooks i m p = 
   let rc = lift $ yield $ Res (object [ "result" .= ("continue"::Text) ]) i 
   in case m of
-    "init" -> do 
-          liftIO $ connectCln $ fromInit p
-          rc
+    "init" -> case fromJSON p :: Result Init of 
+        (Success x) ->  do 
+            liftIO $ connectCln $ (ldir.configuration $ x) <> "/" <> (rpc5file.configuration $ x)
+            rc
+        (Error q) -> rc
     "getmanifest" -> lift $ yield $ Res manifest i 
       
       -- HOOK
@@ -118,17 +120,17 @@ hooks i m p =
                   "nodes loaded" .= order g
                 , "balancing paths" .= length p
               ]) i
-    "stormsize" -> do 
+    "stormnetwork" -> do 
           g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [
                 "nodes" .= order g 
               , "edges" .= size g
               , "capacity" .= (prettyI (Just ',') $ capacity g 0 )
-              , "ze levels" .= (object
+              , "x levels" .= (object
                   $ map (\(l,c)-> (fromString.show $ l) .= c )
                   $ foldr lvls [] (level (node'.fst.matchAny $ g) g)
               )]) i
-    "stormnode" -> do 
+    "stormrebalance" -> do 
           paths <- liftIO $ rebalance 89000
           lift $ yield $ Res (toJSON paths) i
     "stormpaths" -> do 
@@ -147,14 +149,14 @@ hooks i m p =
               otherwise -> rc
           where 
               summarizeFunds j = object [
-                    "sat chain withdraw or channel(s)" .= (prettyI (Just ',') 
+                    "chain withdraw or channel(s)" .= (prettyI (Just ',') 
                         $ (`div` 1000) $ sum  $ map  (amount_msat :: LFOutput -> Msat) (outputs j))
-                  , "sat lightning pay | invoice" .= (
+                  , "lightning pay | invoice" .= (
                         (prettyI (Just ',') ourTote) <> " | " <> (prettyI (Just ',') (tote - ourTote) )   
-                  ), "ye limbo" .=  (object $ map (\(s',i')-> ( (fromString s') .= (prettyI (Just ',') (div i' 1000)))) 
+                  ),"limbo" .=  (object $ map (\(s',i')-> ( (fromString s') .= (prettyI (Just ',') (div i' 1000)))) 
                                             $ filter (\x -> (fst x) /= ("CHANNELD_NORMAL"::String))
                                             $ foldr channelBreakdown [] c' )
-                  , "ze balances" .= (countPots $ pots $ filter (isJust.sci) c') 
+                  , "x balances" .= (countPots $ pots $ filter (isJust.sci) c') 
                   ]                
                   where tote = (`div`1000).sum $ map (amount_msat::LFChannel->Msat) normies
                         ourTote = (`div`1000).sum $ map our_amount_msat normies
@@ -165,7 +167,6 @@ hooks i m p =
                             Just cur -> (__state  x, cur + (our_amount_msat :: LFChannel -> Msat) x) : 
                                         (filter ((/= (__state x)).fst) a)  
                             Nothing -> (__state  x, (our_amount_msat :: LFChannel -> Msat) x) : a
-
 
 capacity :: Gra -> Msat -> Msat 
 capacity g t
@@ -191,3 +192,5 @@ getNodeArg i v = case v ^? nth i . _String of
 
 chamnt :: Channel -> Msat
 chamnt = amount_msat
+ldir :: InitConfig -> String 
+ldir = lightning5dir

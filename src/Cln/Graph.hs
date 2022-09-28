@@ -30,7 +30,6 @@ type Cxt = Context NodeInfo Channel
 graphRef :: IORef Gra
 graphRef = unsafePerformIO $ newIORef empty 
 
-
 loadGraph :: IO ()
 loadGraph = (allchannels) >>= \case 
     (Just (Correct (Res listchannels _))) -> (allnodes) >>= \case 

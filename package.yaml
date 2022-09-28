@@ -13,23 +13,20 @@ description: test
 
 dependencies:
 - base >= 4.7 && < 5
-- random
+- fgl
 - aeson 
-- lens
 - lens-aeson
+- lens
 - attoparsec
-- bytestring 
 - conduit 
-- mtl 
 - network 
-- text 
 - transformers 
-- containers
-- fgl 
-- sqlite-simple
-- directory
+- mtl 
+- bytestring 
+- text 
 - composition-extra
 - format-numbers
+- random
 
 library:
   source-dirs: src

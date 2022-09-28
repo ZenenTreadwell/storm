@@ -23,14 +23,10 @@ import Cln.Client
 import Cln.Graph
 import Cln.Conduit
 import Cln.Paths
-logg m = System.IO.appendFile "/home/o/Desktop/logy" $ m <> "\n"
 
-type Circle = PathInfo  --- (Activity, PathInfo) 
-data Activity = Activity -- {
-    --   attempts :: [ListSendPays]
- --   }
+type Circle = (Activity, PathInfo) 
+type Activity = [ WaitSendPay ]  
 
--- (routes , budget) 
 circleRef :: IORef [Circle] 
 circleRef = unsafePerformIO $ newIORef [] 
  
@@ -45,14 +41,13 @@ genCircles = getinfo >>= \case
                                         $ filter (isJust.sci)
                                         $ chlf wallet
                     p <- bftFP g' (matchChannels outy e) (matchChannels inny a)
-                    liftIO $ logg $ "found " <> (show.length) p <> " circles" 
-                    liftIO $ writeIORef circleRef $ p
+                    liftIO $ writeIORef circleRef $ map ((,) []) p
 
 rebalance :: Msat -> IO [Maybe ListSendPays]  
 rebalance max = do 
     p <- liftIO $ readIORef circleRef
-    trySends <- mapM woosh $ getSome max [] $ p  -- map snd p 
-    tryChecks <- mapM choosh trySends
+    trySends <- mapM payRoute $ getSome max [] $ map snd $ p 
+    tryChecks <- mapM checkHash trySends
     pure tryChecks
 
 getSome :: Msat -> [[Route]] -> [PathInfo] -> [[Route]] 
@@ -70,30 +65,25 @@ getSome max q (p:px) =
     in if (max > fee) then getSome (max - fee) (r : q) px
                       else q  
 
--- !!! sendpay !!! and... It's gone
-woosh :: [Route] -> IO String -- payment hash  
-woosh r =  
-    let   -- unrepeat^^
-        edest = (___id :: Route->String).last $ r
+payRoute :: [Route] -> IO String
+payRoute r =  
+    let edest = (___id::Route->String).last $ r
         famt = ramt.head $ r
         eamt = ramt.last $ r 
         fee = famt - eamt
         msg = "move " <> (show famt) <> " with " <> (show fee) <> "msat fee (" <> edest <> ")"
     in do 
-        logg msg
         ui <- randomIO       
-        payto <- b11invoice eamt ((show (ui::Int))::String) msg 
-        case payto of 
-            (Just (Correct (Res invo  _))) -> do
-                payy <- sendpay r phsh ((payment_secret::Invoice->String) invo) 
-                case payy of 
+        ( b11invoice eamt (show (ui::Int)) msg ) >>= \case  
+            (Just (Correct (Res invoice  _))) -> 
+                ( sendpay r phsh ((payment_secret::Invoice->String) invoice) ) >>= \case 
                     (Just (Correct (Res povo  _))) -> pure phsh
-                    otherwise -> pure phsh  
-                where phsh = (payment_hash::Invoice->String) invo
+                    otherwise -> pure phsh
+                where phsh = (payment_hash::Invoice->String) invoice
             otherwise -> pure ""  
 
-choosh :: String -> IO (Maybe ListSendPays ) 
-choosh phsh = (waitsendpay phsh) >>= \case 
+checkHash :: String -> IO (Maybe ListSendPays ) 
+checkHash phsh = (waitsendpay phsh) >>= \case 
     otherwise -> (listsendpays phsh) >>= \case   
         (Just (Correct (Res w _))) -> pure $ Just w 
         otherwise -> pure Nothing 
@@ -104,7 +94,7 @@ matchChannels adj cx =  filter ((flip elem cx).cci.fst) adj
 pots :: [LFChannel] -> (A,A,A,A,A)
 pots a = foldr p2 ([],[],[],[],[]) $ map ratiod a
 
-type A = [String] -- shortIDs
+type A = [String]
 p2 :: (String, Ratio Msat) -> (A,A,A,A,A) -> (A,A,A,A,A) 
 p2 (sid, b) (emp, midemp, goldi, midful, ful)
     | b < 0.2   = (sid:emp, midemp, goldi, midful, ful)

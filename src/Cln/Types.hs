@@ -71,6 +71,26 @@ data Movement = Movement {
 instance FromJSON Movement where 
     parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
 
+data Init = Init {
+      --options :: Value
+     configuration :: InitConfig
+    } deriving (Show, Generic) 
+instance FromJSON Init
+instance ToJSON Init
+
+data InitConfig = InitConfig {
+      lightning5dir :: String 
+    , rpc5file :: String 
+    , startup :: Bool 
+    , network :: String 
+    , feature_set :: Features 
+    --, proxy :: Addr 
+    , torv35enabled :: Bool 
+    , always_use_proxy :: Bool 
+  } deriving (Show, Generic) 
+instance FromJSON InitConfig where
+    parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = map repl . dropWhile (=='_')} v
+instance ToJSON InitConfig
 --Hook data
 data InvoicePayment = InvoicePayment {
     payment :: Payment } deriving (Show, Generic)  
@@ -119,7 +139,6 @@ instance FromJSON GetInfo where
 repl '5' = '-'
 repl o = o
 
-
 data SendPay = SendPay {
       message :: Maybe String
     , _____id :: Int 
@@ -143,7 +162,6 @@ instance FromJSON SendPay where
         , fieldLabelModifier = dropWhile (=='_')} v
 instance ToJSON SendPay where
     toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
-
 
 data WaitSendPay = WaitSendPay {
       ___id :: Maybe Int 
@@ -193,8 +211,6 @@ instance FromJSON FailSP where
         , fieldLabelModifier = dropWhile (=='_')} v
 instance ToJSON FailSP where
     toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
-
-
 
 data ListSendPays = ListSendPays {
     payments :: [SendPays] 

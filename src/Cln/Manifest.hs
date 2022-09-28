@@ -13,21 +13,11 @@ manifest :: Value
 manifest = object [
     "options" .= ([]::[Option]), 
     "rpcmethods" .= ([
-          RpcMethod "stormload" "" "Loads graph into memory" Nothing False  
-        --, RpcMethod "stormcircle" "" "Return all circular routes by size (ie triangle, square, ..)" Nothing False
-        , RpcMethod "stormsize" "" "Return info about nodes stored in memory" Nothing False  
-        , RpcMethod "stormcomponents" "" "Return graphs components (segments)" Nothing False  
-        , RpcMethod "stormnode" "[nodeid]" "Load node data." Nothing False 
-        , RpcMethod "stormpaths" "[n1, n2]" "Show fee info about paths between two nodes." Nothing False 
-        , RpcMethod "stormwallet" "" "Show wallet totals." Nothing False 
-        --, RpcMethod "stormcandidates" "" "Return list of far away nodeid." Nothing False 
-        -- hold invoice functionality 
-        --, RpcMethod "storminvoice" "[amt]" "Return an invoive that will be held." Nothing False
-        --, RpcMethod "stormaccept" "[invoice]" "" Nothing False 
-        --, RpcMethod "stormrefuse" "[invoice]" "" Nothing False 
-        -- todo - fund management functionality
-        --, RpcMethod "stormdeploy" "" "Divide available between candidates & batch open" Nothing False 
-        --, RpcMethod "stormrebalance" "[node1,node2]" "Try keysend between channels" Nothing False 
+          RpcMethod "stormwallet" "" "Show wallet totals and some channel info." Nothing False 
+        , RpcMethod "stormload" "" "Loads graph into memory" Nothing False  
+        , RpcMethod "stormnetwork" "" "Return info about nodes stored in memory" Nothing False  
+        , RpcMethod "stormrebalance" "" "Init rebalance attempts. Spending cap 89 satoshi." Nothing False 
+        , RpcMethod "stormpaths" "[n1, n2]" "Find shortest path of all in/out pairs, sorted by fee." Nothing False 
     ]), 
     "hooks" .= ([
         --  Hook "invoice_payment" Nothing 
@@ -48,8 +38,9 @@ manifest = object [
     ],
     "notifications" .= ([]::[Notification]), 
     "subscriptions" .= ([
-          "channel_opened"
-        , "channel_state_changed" 
+        "coin_movement"
+        --, "channel_opened"
+        --, "channel_state_changed" 
         --, "connect" 
         --, "disconnect" 
         --, "invoice_payment"  
@@ -58,8 +49,7 @@ manifest = object [
         --, "forward_event" 
         --, "sendpay_success" 
         --, "sendpay_failure"
-        , "coin_movement"
-        , "balance_snapshot"
+        --, "balance_snapshot"
         --, "openchannel_peer_sigs"
         --, "shutdown"  
     ]::[Text]), 
