@@ -3,6 +3,7 @@
     , OverloadedStrings 
     , DuplicateRecordFields
 #-}
+
 module Cln.Plugin where 
 
 import Cln.Conduit
@@ -12,6 +13,7 @@ import Cln.Types
 import Cln.Client 
 import Cln.Graph 
 import Cln.Paths
+import Cln.Wallet
 import System.IO
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class 
@@ -84,7 +86,9 @@ hooks i m p =
   in case m of
     "init" -> case fromJSON p :: Result Init of 
         (Success x) ->  do 
-            liftIO $ connectCln $ (ldir.configuration $ x) <> "/" <> (rpc5file.configuration $ x)
+            liftIO $ connectCln
+                   $ ((lightning5dir::InitConfig -> String).configuration $ x)  
+                   <> "/" <> (rpc5file.configuration $ x)
             rc
         (Error q) -> rc
     "getmanifest" -> lift $ yield $ Res manifest i 
@@ -130,6 +134,10 @@ hooks i m p =
                   $ map (\(l,c)-> (fromString.show $ l) .= c )
                   $ foldr lvls [] (level (node'.fst.matchAny $ g) g)
               )]) i
+              where  lvls :: (Node, Int) -> [(Int, Int)] -> [(Int, Int)]
+                     lvls (m, i) q = case lookup i q of 
+                        Nothing -> (i, 1) : q 
+                        Just x -> (i, x + 1) : filter ((/= i).fst) q 
     "stormrebalance" -> do 
           paths <- liftIO $ rebalance 89000
           lift $ yield $ Res (toJSON paths) i
@@ -139,58 +147,12 @@ hooks i m p =
           where 
               x = getNodeInt $ getNodeArg 0 p
               y = getNodeInt $ getNodeArg 1 p 
+              getNodeArg i v = case v ^? nth i . _String of
+                  (Just b) -> filter isHexDigit (show b) 
+                  Nothing -> ""
     -- UTIL 
     "stormwallet" -> do 
-          fun <- liftIO $ listfunds  
-          case fun of 
-              (Just (Correct (Res fun' _))) -> 
-                  lift $ yield $ Res (summarizeFunds fun') i   
-              (Just x) -> lift $ yield $ Res (object ["x" .= (show x)]) i
-              otherwise -> rc
-          where 
-              summarizeFunds j = object [
-                    "chain withdraw or channel(s)" .= (prettyI (Just ',') 
-                        $ (`div` 1000) $ sum  $ map  (amount_msat :: LFOutput -> Msat) (outputs j))
-                  , "lightning pay | invoice" .= (
-                        (prettyI (Just ',') ourTote) <> " | " <> (prettyI (Just ',') (tote - ourTote) )   
-                  ),"limbo" .=  (object $ map (\(s',i')-> ( (fromString s') .= (prettyI (Just ',') (div i' 1000)))) 
-                                            $ filter (\x -> (fst x) /= ("CHANNELD_NORMAL"::String))
-                                            $ foldr channelBreakdown [] c' )
-                  , "x balances" .= (countPots $ pots $ filter (isJust.sci) c') 
-                  ]                
-                  where tote = (`div`1000).sum $ map (amount_msat::LFChannel->Msat) normies
-                        ourTote = (`div`1000).sum $ map our_amount_msat normies
-                        normies = filter (\c -> __state c == "CHANNELD_NORMAL") $ c'
-                        c' = (channels :: ListFunds -> [LFChannel]) j
-                        channelBreakdown :: LFChannel -> [(String, Int)] -> [(String, Int)] 
-                        channelBreakdown x a = case lookup (__state x) a of 
-                            Just cur -> (__state  x, cur + (our_amount_msat :: LFChannel -> Msat) x) : 
-                                        (filter ((/= (__state x)).fst) a)  
-                            Nothing -> (__state  x, (our_amount_msat :: LFChannel -> Msat) x) : a
+          w <- liftIO wallet
+          lift $ yield $ Res w i 
 
-capacity :: Gra -> Msat -> Msat 
-capacity g t
-    | isEmpty g = t
-    | otherwise = case matchAny g of
-        (n, g') -> capacity g' $ t + ( (sum.(map chamnt).(map fst).lneighbors') n)     
 
-countPots (a,b,c,d,e) = object [
-      "a. depleted" .= length a
-    , "b. mid-low" .= length b 
-    , "c. balanced" .= length c 
-    , "d. mid-high" .= length d
-    , "e. full" .= length e  
-    ]
-lvls :: (Node, Int) -> [(Int, Int)] -> [(Int, Int)]
-lvls (m, i) q = case lookup i q of 
-    Nothing -> (i, 1) : q 
-    Just x -> (i, x + 1) : filter ((/= i).fst) q 
-
-getNodeArg i v = case v ^? nth i . _String of
-    (Just b) -> filter isHexDigit (show b) 
-    Nothing -> ""
-
-chamnt :: Channel -> Msat
-chamnt = amount_msat
-ldir :: InitConfig -> String 
-ldir = lightning5dir

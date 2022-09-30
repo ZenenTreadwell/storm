@@ -18,8 +18,12 @@ https://lightning.readthedocs.io/PLUGINS.html
   
 (in progress)
 - economic rebalancer 
-- competitive fee adjustments 
-- hold invoice interface
+- fee adjustments 
+- hold invoices
+- channel suggester
+- accurate/specific types 
+- tests?
+- ...
 
 ##### Files 
 app/Main - executable root; connects conduit to plugin
@@ -32,11 +36,8 @@ try in `stack gchi`:
     \> :l Cln.Client
     \> connectCln "<rpc-file-path>" 
     \> getinfo
+Wallet - create funds summary
 Balance !! work in progress
-
-
-
-
 
 ##### Audit Requests
 /src/Cln/Paths 
@@ -44,13 +45,12 @@ createRoute :: PathInfo :: [Route]
     
 /src/Cln/Rebalance 
 payRoute :: [Route] -> IO String
-     - have only tried on circular routes; see fails from my node so probably broken
+    - have only tried on circular routes 
+    - failures from my node on both ends, probably broken
+
 
 {
+"alias": "Dagnela 🦄 Hunter",
 "id": "0337694505123a12a8fadd95523dcc235898ad3b80a06e4a63ca26fed68dd0d17c",
 "network":"bitcoin"
 }
-
-       
-
-

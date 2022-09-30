@@ -88,13 +88,13 @@ checkHash phsh = (waitsendpay phsh) >>= \case
         (Just (Correct (Res w _))) -> pure $ Just w 
         otherwise -> pure Nothing 
 
+type A = [String]
 matchChannels :: Adj Channel -> A -> Adj Channel 
-matchChannels adj cx =  filter ((flip elem cx).cci.fst) adj
+matchChannels adj cx = take 5 $ filter ((flip elem cx).cci.fst) adj
 
 pots :: [LFChannel] -> (A,A,A,A,A)
 pots a = foldr p2 ([],[],[],[],[]) $ map ratiod a
 
-type A = [String]
 p2 :: (String, Ratio Msat) -> (A,A,A,A,A) -> (A,A,A,A,A) 
 p2 (sid, b) (emp, midemp, goldi, midful, ful)
     | b < 0.2   = (sid:emp, midemp, goldi, midful, ful)
