@@ -139,8 +139,9 @@ hooks i m p =
                         Nothing -> (i, 1) : q 
                         Just x -> (i, x + 1) : filter ((/= i).fst) q 
     "stormrebalance" -> do 
-          paths <- liftIO $ rebalance 89000
-          lift $ yield $ Res (toJSON paths) i
+          -- liftIO $ rebalance 89000
+          c <- liftIO $ readIORef circleRef
+          lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
     "stormpaths" -> do 
           paths <- liftIO $ bftFindPaths x y  
           lift $ yield $ Res (toJSON paths) i 

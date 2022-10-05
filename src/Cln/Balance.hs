@@ -12,6 +12,7 @@ import System.IO.Unsafe
 import Control.Monad.IO.Class
 import GHC.IORef
 import Control.Concurrent
+import Control.Monad.State
 import Data.Graph.Inductive.Graph
 import Data.Ratio
 import Data.List 
@@ -24,8 +25,8 @@ import Cln.Graph
 import Cln.Conduit
 import Cln.Paths
 
-type Circle = (Activity, PathInfo) 
-type Activity = [ WaitSendPay ]  
+type Circle = (Attempts, PathInfo) 
+type Attempts = [ Maybe ListSendPays ]  
 
 circleRef :: IORef [Circle] 
 circleRef = unsafePerformIO $ newIORef [] 
@@ -43,36 +44,41 @@ genCircles = getinfo >>= \case
                     p <- bftFP g' (matchChannels outy e) (matchChannels inny a)
                     liftIO $ writeIORef circleRef $ map ((,) []) p
 
-rebalance :: Msat -> IO [Maybe ListSendPays]  
+rebalance :: Msat -> IO ()   
 rebalance max = do 
     p <- liftIO $ readIORef circleRef
-    trySends <- mapM payRoute $ getSome max [] $ map snd $ p 
-    tryChecks <- mapM checkHash trySends
-    pure tryChecks
+    c <- evalStateT (mapM attempt p) max  
+    liftIO $ writeIORef circleRef c
+        
+attempt :: Circle -> StateT Msat IO Circle 
+attempt c@(a, p) = do 
+    max <- get
+    hash <- liftIO $ payRoute max p
+    msp <- liftIO $ checkHash hash
+    case msp of 
+        Nothing -> pure c
+        sp -> do 
+            put $ max - 20000 
+            pure ((sp:a), p)     
 
-getSome :: Msat -> [[Route]] -> [PathInfo] -> [[Route]] 
-getSome _ _ [] = [] 
-getSome max q (p:px) = 
+getFee :: Maybe ListSendPays -> Int
+getFee _ = 20000
+
+payRoute :: Msat -> PathInfo -> IO String
+payRoute max p =  
     let f = head.path $ p
         e = last.path $ p
         sf = camt f
         se = camt e
-        amt = min (div (min sf se) 3 ) (neck p `div` 3)
-        r = createRoute amt p
+        size = min (div (min sf se) 3 ) (neck p `div` 3) 
+        r = createRoute size p     
+        edest = (___id::Route->String).last $ r
+        isCircle = (==) edest ((source::Channel->String) f)
         famt = ramt.head $ r
         eamt = ramt.last $ r 
         fee = famt - eamt
-    in if (max > fee) then getSome (max - fee) (r : q) px
-                      else q  
-
-payRoute :: [Route] -> IO String
-payRoute r =  
-    let edest = (___id::Route->String).last $ r
-        famt = ramt.head $ r
-        eamt = ramt.last $ r 
-        fee = famt - eamt
-        msg = "move " <> (show famt) <> " with " <> (show fee) <> "msat fee (" <> edest <> ")"
-    in do 
+        msg = (show fee) <> "msat fee (" <> edest <> ")"
+    in if fee < max && isCircle then do 
         ui <- randomIO       
         ( b11invoice eamt (show (ui::Int)) msg ) >>= \case  
             (Just (Correct (Res invoice  _))) -> 
@@ -81,8 +87,9 @@ payRoute r =
                     otherwise -> pure phsh
                 where phsh = (payment_hash::Invoice->String) invoice
             otherwise -> pure ""  
+        else pure ""
 
-checkHash :: String -> IO (Maybe ListSendPays ) 
+checkHash :: String -> IO (Maybe ListSendPays) 
 checkHash phsh = (waitsendpay phsh) >>= \case 
     otherwise -> (listsendpays phsh) >>= \case   
         (Just (Correct (Res w _))) -> pure $ Just w 
@@ -91,7 +98,6 @@ checkHash phsh = (waitsendpay phsh) >>= \case
 type A = [String]
 matchChannels :: Adj Channel -> A -> Adj Channel 
 matchChannels adj cx = take 5 $ filter ((flip elem cx).cci.fst) adj
-
 pots :: [LFChannel] -> (A,A,A,A,A)
 pots a = foldr p2 ([],[],[],[],[]) $ map ratiod a
 

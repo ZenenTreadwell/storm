@@ -32,14 +32,88 @@ instance ToJSON PathInfo where
         , "cost" .= cost p
         , "neck" .= neck p
         , "route" .= createRoute 1000000000 p
+        , "channels" .= path p
         ]
 
 createRoute :: Msat -> PathInfo -> [Route] 
 createRoute a c | a > neck c = []  
-createRoute a c = foldr (c3 a) [] $ pairUp $ path c 
+createRoute a c = foldr (addHop a) [] $ pairUp $ path c 
+    where 
+        pairUp :: [Channel] -> [(Channel,Channel)] 
+        pairUp [] = [] 
+        pairUp (a:[]) = [(a,a)] 
+        pairUp (a:b) = (a,head b) : pairUp b
+
+        addHop :: Msat -> (Channel, Channel) -> [Route] -> [Route] 
+        addHop a (cp, c)  r = Route 
+            ((destination::Channel->String) cp) 
+            ((short_channel_id::Channel->String) cp)
+            (getDirect (source cp) ((destination::Channel->String) cp))
+            (getAmount a c r)
+            (getDelay c r) 
+            "tlv" 
+            : r 
+
+        getDirect :: String -> String -> Int
+        getDirect a b = if readHex a < readHex b then 0 else 1
+
+        getDelay :: Channel -> [Route] -> Int
+        getDelay e [] = 9
+        getDelay e (r:_) = (delay::Route->Int) r + (delay::Channel->Int) e         
+        
+        getAmount :: Msat -> Channel -> [Route] -> Msat
+        getAmount a e [] = a
+        getAmount a e r = 
+            let  
+                mil = 1000000 :: Integer
+                basefee = base_fee_millisatoshi e
+                ppmrate = fee_per_millionth e
+                num = (mil * toInteger nextAmount * toInteger ppmrate) 
+                denum = mil*mil
+                ppmfee  = fromInteger $ div num denum
+                nextAmount = maximum $ map (amount_msat::Route->Msat) r
+                amount = sum [ nextAmount , basefee , ppmfee ] 
+                isSane = amount > nextAmount
+            in if isSane 
+                   then amount 
+                   else error $ "route create irrational, aborting"
+                             <> "(basefee, ppmrate, ppmfee, nextAmount, amount, isSane)" 
+                             <> show (basefee, ppmrate, ppmfee, nextAmount, amount, isSane) 
+
+
+manualFindPaths :: Node -> Node -> IO [PathInfo]
+manualFindPaths n1 n2 = do 
+    gra <- readIORef graphRef
+    case ( match n1 gra             ,  match n2 gra) of  
+        ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> 
+            pure [] 
+                -- $ sort
+                -- $ map summarizePath   
+                -- $ map repackPath
+                -- $ filter (\(_,p,_)-> (length.unLPath) p > 0)
+                -- $ map (\(a,pf,b) -> (a,pf g, b) )
+                -- $ _ 
+                -- a$ _ 
+                -- $ filter ((flip elem (map (dstn.fst) outy)).dstn.snd.head.unLPath)
+                -- $ spTree n2 (emap (amount_msat::Channel->Msat) g)
+        otherwise -> pure [] 
+
+
+dstn = (destination::Channel->String)
+
+depackPath :: LPath Channel 
+depackPath = undefined 
+summarizePath :: [Channel] -> PathInfo
+summarizePath s@(_:sx) = foldr c2 (initP s) sx
+repackPath :: (Channel, LPath Channel, Channel) -> [Channel]
+repackPath (f,p,e) = [f] <> ((lp.unLPath) p) <> [e]
+lp :: [LNode Channel] -> [Channel]
+lp [] = [] 
+lp (p:px) = map snd px
+
 
 initP :: [Channel] -> PathInfo 
-initP p = P (0) (Fee 0 0) maxBound p 
+initP p = P (1) (Fee 0 0) maxBound p
 
 bftFindPaths :: Node -> Node -> IO [PathInfo]
 bftFindPaths n v = do 
@@ -47,7 +121,7 @@ bftFindPaths n v = do
     case ( match n gra                ,  match v gra) of 
         ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> 
             bftFP g oo ii
-            where oo = filter (\(f, n') -> v /= n') outy --filter direct channel 
+            where oo = filter (\(f, n') -> v /= n') outy  
                   ii = filter (\(f, n') -> n /= n') inny
         otherwise -> pure []    
 
@@ -70,14 +144,7 @@ fp (f, t) (e, v) = (f, (getLPath v).t , e)
 outTree :: (Channel, Node) -> (Channel, Gra -> LRTree Channel) 
 outTree o = (fst o, lbft $ snd o)   
 
-repackPath :: (Channel, LPath Channel, Channel) -> [Channel]
-repackPath (f,p,e) = [f] <> ((lp.unLPath) p) <> [e]
-lp :: [LNode Channel] -> [Channel]
-lp [] = [] 
-lp (p:px) = map snd px
 
-summarizePath :: [Channel] -> PathInfo
-summarizePath s@(_:sx) = foldr c2 (initP s) sx
 c2 :: Channel -> PathInfo -> PathInfo 
 c2 e c = P
     (hops c + 1)
@@ -100,26 +167,4 @@ instance Eq PathInfo where
 instance Ord PathInfo where 
     compare a b = compare (cost a) (cost b) 
 
-pairUp :: [Channel] -> [(Channel,Channel)] 
-pairUp [] = [] 
-pairUp (a:[]) = [(a,a)] 
-pairUp (a:b) = (a,head b) : pairUp b
-c3 :: Msat -> (Channel, Channel)  -> [Route] -> [Route] 
-c3 a (cp, c)  r = Route 
-    ((destination::Channel->String) cp) 
-    ((short_channel_id::Channel->String) cp)
-    (getDirect (source cp) ((destination::Channel->String) cp))
-    (getAmount a c r)
-    (getDelay c r) 
-    "tlv" 
-    : r 
-getDirect :: String -> String -> Int
-getDirect a b = if readHex a < readHex b then 0 else 1
-getDelay :: Channel -> [Route] -> Int
-getDelay e [] = 9
-getDelay e (r:_) = (delay::Route->Int) r + (delay::Channel->Int) e         
-getAmount :: Msat -> Channel -> [Route] -> Msat
-getAmount a e [] = a
-getAmount a e r = (+)
-    (maximum $ map (amount_msat::Route->Msat) r)
-    (base_fee_millisatoshi e + ( div (1000000 * a * (fee_per_millionth e)) (1000000*1000000)))
+-- what the ACTUAL FUCK
