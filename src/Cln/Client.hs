@@ -62,10 +62,10 @@ b11invoice a l d = tick $ Req ("invoice"::Text) (object [
         , "description" .= d ])  
 
 sendpay :: [Route] -> String -> String -> Cln SendPay 
-sendpay r h v =  tick $ Req ("sendpay"::Text) (object [
+sendpay r h s =  tick $ Req ("sendpay"::Text) (object [
           "route" .= r
         , "payment_hash" .=  h
-        , "payment_secret" .= v
+        , "payment_secret" .= s
         ])  
 
 listsendpays :: String -> Cln ListSendPays 

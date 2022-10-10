@@ -26,6 +26,7 @@ dependencies:
 - text 
 - composition-extra
 - format-numbers
+- containers
 - random
 
 library:

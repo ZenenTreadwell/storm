@@ -9,16 +9,23 @@ import Cln.Types
 import Cln.Client
 import Cln.Graph
 import System.IO
+import Control.Monad.Trans.State.Lazy
+import Control.Monad.IO.Class
+import qualified Data.Sequence as Q
+import Data.Sequence( Seq(..) , (<|) , (|>) , (><)) 
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.Query
 import Data.Graph.Inductive.Query.BFS
 import Data.Graph.Inductive.Internal.RootPath
+import qualified Data.Graph.Inductive.Internal.Heap as Heep
 import Data.Aeson 
 import GHC.Generics
 import Numeric 
 import GHC.IORef
 import Data.Function.Flip
 import Data.List
+import Data.Tuple 
+loguy mmm = liftIO $ System.IO.appendFile "/home/o/.ao/loguy" $ mmm <> "\n"
 
 data PathInfo = P {
       hops :: Int
@@ -40,8 +47,8 @@ createRoute a c | a > neck c = []
 createRoute a c = foldr (addHop a) [] $ pairUp $ path c 
     where 
         pairUp :: [Channel] -> [(Channel,Channel)] 
-        pairUp [] = [] 
-        pairUp (a:[]) = [(a,a)] 
+        pairUp [] = []
+        pairUp (a:[]) = [(a,a)]
         pairUp (a:b) = (a,head b) : pairUp b
 
         addHop :: Msat -> (Channel, Channel) -> [Route] -> [Route] 
@@ -72,47 +79,76 @@ createRoute a c = foldr (addHop a) [] $ pairUp $ path c
                 denum = mil*mil
                 ppmfee  = fromInteger $ div num denum
                 nextAmount = maximum $ map (amount_msat::Route->Msat) r
-                amount = sum [ nextAmount , basefee , ppmfee ] 
-                isSane = amount > nextAmount
-            in if isSane 
-                   then amount 
-                   else error $ "route create irrational, aborting"
-                             <> "(basefee, ppmrate, ppmfee, nextAmount, amount, isSane)" 
-                             <> show (basefee, ppmrate, ppmfee, nextAmount, amount, isSane) 
+            in sum [ nextAmount , basefee , ppmfee ] 
 
-
-manualFindPaths :: Node -> Node -> IO [PathInfo]
-manualFindPaths n1 n2 = do 
+findPaths :: Node -> Node -> IO [PathInfo]
+findPaths n1 n2 = do
     gra <- readIORef graphRef
-    case ( match n1 gra             ,  match n2 gra) of  
-        ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> 
-            pure [] 
-                -- $ sort
-                -- $ map summarizePath   
-                -- $ map repackPath
-                -- $ filter (\(_,p,_)-> (length.unLPath) p > 0)
-                -- $ map (\(a,pf,b) -> (a,pf g, b) )
-                -- $ _ 
-                -- a$ _ 
-                -- $ filter ((flip elem (map (dstn.fst) outy)).dstn.snd.head.unLPath)
-                -- $ spTree n2 (emap (amount_msat::Channel->Msat) g)
-        otherwise -> pure [] 
+    d <-  evalStateT (look n2 ( match n1 gra ) ) (Q.empty, [])
+    pure $ map (summarizePath . map snd . reverse . unLPath) d
 
+type Sure = (Q.Seq (LPath Channel), [LPath Channel])
 
+look :: Node 
+     -> Dcp -- :: ( Maybe Cxt , Gra ) 
+     -> StateT Sure IO [LPath Channel] 
+look v (Nothing, g) = do 
+    loguy "look pattern match fail "
+    stop
+look v (Just (ii,nn,nl,oo), g) = get >>= \case 
+    (Empty, []) -> do -- home node
+        loguy "starting search"
+
+        put $ (foldr (append (LP []) ) Q.empty oo, [])  
+
+        next v
+    (Empty, q) -> do
+        loguy "Q empty? "
+        stop 
+    ( p@(LP l) :<| ax , fin ) ->  
+        if length fin > 100 then stop 
+        else if nn == v then do 
+            loguy $ "matchering " <> show p 
+            put $ (ax, p : fin) 
+            next v 
+        else do 
+            loguy $ "extendering " <> show (length l, length fin, Q.length ax) 
+            put $ (foldr (append p) ax oo , fin) 
+            next v  
+              
+next :: Node -> StateT Sure IO [LPath Channel]
+next v = get >>= \case 
+    ( (LP ((n,c):ax)) :<| qx , fin ) -> do 
+        g <- liftIO $ readIORef graphRef
+        loguy $ "moving on ? " <> show (n, order g, length fin, length ax, Q.length qx) 
+        loguy.show $ gelem n g 
+        look v (match n g)
+    otherwise -> do 
+        loguy "next pattern match fail" 
+        stop
+
+stop :: StateT Sure IO [LPath Channel]
+stop = get >>= \case 
+    (_, fin) -> pure fin 
+
+append :: LPath Channel -> (Channel, Node) -> Q.Seq (LPath Channel) -> Q.Seq (LPath Channel)
+append (LP p) x q = q |> (LP $ (swap x) : p) 
+
+extendP :: LPath Channel -> LNode Channel -> LPath Channel
+extendP p m = LP $ m : (unLPath p) 
+    
 dstn = (destination::Channel->String)
 
-depackPath :: LPath Channel 
-depackPath = undefined 
 summarizePath :: [Channel] -> PathInfo
 summarizePath s@(_:sx) = foldr c2 (initP s) sx
+
 repackPath :: (Channel, LPath Channel, Channel) -> [Channel]
 repackPath (f,p,e) = [f] <> ((lp.unLPath) p) <> [e]
 lp :: [LNode Channel] -> [Channel]
 lp [] = [] 
 lp (p:px) = map snd px
 
-
-initP :: [Channel] -> PathInfo 
+initP :: [Channel] -> PathInfo
 initP p = P (1) (Fee 0 0) maxBound p
 
 bftFindPaths :: Node -> Node -> IO [PathInfo]
@@ -144,13 +180,15 @@ fp (f, t) (e, v) = (f, (getLPath v).t , e)
 outTree :: (Channel, Node) -> (Channel, Gra -> LRTree Channel) 
 outTree o = (fst o, lbft $ snd o)   
 
-
 c2 :: Channel -> PathInfo -> PathInfo 
 c2 e c = P
     (hops c + 1)
     (Fee ( (base.cost) c + base_fee_millisatoshi e )
          ( ((hops c)*((ppm.cost) c) + fee_per_millionth e ) `div` (hops c + 1) ))
-    (min (neck c) ((amount_msat::Channel->Msat) e ) )
+    ( case htlc_maximum_msat e of 
+        (Just x) -> minimum [(neck c), ((amount_msat::Channel->Msat) e), x]
+        otherwise -> min (neck c) ((amount_msat::Channel->Msat) e) 
+    )
     (path c)
 
 getCircles :: Node -> IO [PathInfo]
@@ -166,5 +204,3 @@ instance Eq PathInfo where
     (==) a b = (base.cost $ a) == (base.cost $ b) && (ppm.cost $ a) == (ppm.cost $ b)
 instance Ord PathInfo where 
     compare a b = compare (cost a) (cost b) 
-
--- what the ACTUAL FUCK

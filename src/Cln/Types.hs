@@ -213,12 +213,12 @@ instance ToJSON FailSP where
     toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
 
 data ListSendPays = ListSendPays {
-    payments :: [SendPays] 
+    payments :: [LPPayment] 
     } deriving (Generic, Show) 
 instance FromJSON ListSendPays
 instance ToJSON ListSendPays
 
-data SendPays = SendPays {
+data LPPayment = LPPayment {
       ______id :: Int 
     , groupid :: Int 
     , payment_hash :: String 
@@ -234,11 +234,11 @@ data SendPays = SendPays {
     , erroronion :: Maybe String 
     , payment_preimage :: Maybe String 
     } deriving (Generic, Show)
-instance FromJSON SendPays where 
+instance FromJSON LPPayment where 
     parseJSON v = genericParseJSON defaultOptions{
           omitNothingFields = True
         , fieldLabelModifier = dropWhile (=='_')} v
-instance ToJSON SendPays where
+instance ToJSON LPPayment where
     toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
 
 data SetChannel = SetChannel {

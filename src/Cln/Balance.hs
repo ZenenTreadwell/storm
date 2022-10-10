@@ -26,7 +26,7 @@ import Cln.Conduit
 import Cln.Paths
 
 type Circle = (Attempts, PathInfo) 
-type Attempts = [ Maybe ListSendPays ]  
+type Attempts = [ ListSendPays ]  
 
 circleRef :: IORef [Circle] 
 circleRef = unsafePerformIO $ newIORef [] 
@@ -47,57 +47,70 @@ genCircles = getinfo >>= \case
 rebalance :: Msat -> IO ()   
 rebalance max = do 
     p <- liftIO $ readIORef circleRef
-    c <- evalStateT (mapM attempt p) max  
+    c <- evalStateT (mapM payPath p) max   
     liftIO $ writeIORef circleRef c
-        
-attempt :: Circle -> StateT Msat IO Circle 
-attempt c@(a, p) = do 
-    max <- get
-    hash <- liftIO $ payRoute max p
-    msp <- liftIO $ checkHash hash
-    case msp of 
-        Nothing -> pure c
-        sp -> do 
-            put $ max - 20000 
-            pure ((sp:a), p)     
 
 getFee :: Maybe ListSendPays -> Int
 getFee _ = 20000
 
-payRoute :: Msat -> PathInfo -> IO String
-payRoute max p =  
-    let f = head.path $ p
+payPath :: Circle -> StateT Msat IO Circle
+payPath c@(a,p) = do 
+    max <- get
+    if fee < max && isCircle then do 
+        ui <- liftIO randomIO       
+        ir <- liftIO $ b11invoice eamt (show (ui::Int)) msg
+        case ir of    
+            (Just (Correct (Res invoice  _))) -> 
+                let
+                    phsh = (payment_hash::Invoice->String) invoice
+                    psct = (payment_secret::Invoice->String) invoice
+                in do
+                    liftIO $ sendpay r phsh $ psct
+                    ch <- liftIO $ checkHash $ phsh
+                    case ch of 
+                        (Just w) -> do
+                            liftIO $ System.IO.appendFile "/home/o/Desktop/loguy" $ show (max,w) <> "\n" 
+                            if (checkSettled $ payments w) 
+                                then put (max-fee)
+                                else pure () 
+                            pure (w:a ,p) 
+                        otherwise -> pure c
+            otherwise -> pure c  
+    else pure c
+    
+    where
+        f = head.path $ p
         e = last.path $ p
         sf = camt f
         se = camt e
         size = min (div (min sf se) 3 ) (neck p `div` 3) 
         r = createRoute size p     
         edest = (___id::Route->String).last $ r
+        eamt = ramt.last $ r
         isCircle = (==) edest ((source::Channel->String) f)
+        fee = routeFee r
+        msg = (show fee) <> "msat fee (" <> edest <> ")"
+
+
+checkSettled :: [LPPayment] -> Bool 
+checkSettled [] = False 
+checkSettled (x:_) = (==) "settled" ((status::LPPayment->String) x) 
+
+routeFee :: [Route] -> Msat
+routeFee r = famt - eamt
+    where 
         famt = ramt.head $ r
         eamt = ramt.last $ r 
-        fee = famt - eamt
-        msg = (show fee) <> "msat fee (" <> edest <> ")"
-    in if fee < max && isCircle then do 
-        ui <- randomIO       
-        ( b11invoice eamt (show (ui::Int)) msg ) >>= \case  
-            (Just (Correct (Res invoice  _))) -> 
-                ( sendpay r phsh ((payment_secret::Invoice->String) invoice) ) >>= \case 
-                    (Just (Correct (Res povo  _))) -> pure phsh
-                    otherwise -> pure phsh
-                where phsh = (payment_hash::Invoice->String) invoice
-            otherwise -> pure ""  
-        else pure ""
 
 checkHash :: String -> IO (Maybe ListSendPays) 
-checkHash phsh = (waitsendpay phsh) >>= \case 
-    otherwise -> (listsendpays phsh) >>= \case   
+checkHash h = (waitsendpay h) >>= \case 
+    otherwise -> (listsendpays h) >>= \case   
         (Just (Correct (Res w _))) -> pure $ Just w 
         otherwise -> pure Nothing 
 
 type A = [String]
 matchChannels :: Adj Channel -> A -> Adj Channel 
-matchChannels adj cx = take 5 $ filter ((flip elem cx).cci.fst) adj
+matchChannels adj cx = filter ((flip elem cx).cci.fst) adj
 pots :: [LFChannel] -> (A,A,A,A,A)
 pots a = foldr p2 ([],[],[],[],[]) $ map ratiod a
 

@@ -59,5 +59,10 @@ capacity :: Gra -> Msat -> Msat
 capacity g t
     | isEmpty g = t
     | otherwise = case matchAny g of
-        (n, g') -> capacity g' $ t + ( (sum.(map (amount_msat::Channel -> Msat)).(map snd).lsuc') n)     
+        (n, g') -> capacity g' $ t + ( sum 
+            . (map (amount_msat::Channel -> Msat)) 
+            . (map snd)  
+            . lsuc' -- (outchannels) 
+            $ n 
+            )     
 

@@ -20,7 +20,7 @@ manifest = object [
         , RpcMethod "stormpaths" "[n1, n2]" "Find shortest path of all in/out pairs, sorted by fee." Nothing False 
     ]), 
     "hooks" .= ([
-        --  Hook "invoice_payment" Nothing 
+        Hook "invoice_payment" Nothing 
         --  Hook "peer_connected" Nothing
         --, Hook "openchannel" Nothing 
         --, Hook "htlc_accepted" Nothing 

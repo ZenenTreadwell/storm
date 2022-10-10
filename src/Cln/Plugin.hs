@@ -67,7 +67,11 @@ notifications m p = case m of
     "channel_state_changed"  -> pure ()    
     "connect"                -> pure ()     
     "disconnect"             -> pure ()    
-    "invoice_payment"        -> pure ()    
+    "invoice_payment"        -> case ((fromJSON p) :: Result InvoicePayment ) of
+        Success (a)             -> do 
+            liftIO $ System.IO.appendFile "/home/o/Desktop/loguy" $ show a <> "\n"
+            pure () -- recordFwd 
+        Error x                 -> pure ()                       
     "invoice_creation"       -> pure ()    
     "warning"                -> pure ()    
     "forward_event"          -> pure ()    
@@ -117,12 +121,12 @@ hooks i m p =
     -- GRAPH 
     "stormload" -> do 
           liftIO loadGraph  
-          liftIO genCircles 
+          -- liftIO genCircles 
           g <- liftIO $ readIORef graphRef
-          p <- liftIO $ readIORef circleRef  
+          -- p <- liftIO $ readIORef circleRef  
           lift $ yield $ Res (object [
                   "nodes loaded" .= order g
-                , "balancing paths" .= length p
+              --  , "balancing paths" .= length p
               ]) i
     "stormnetwork" -> do 
           g <- liftIO $ readIORef graphRef
@@ -139,11 +143,11 @@ hooks i m p =
                         Nothing -> (i, 1) : q 
                         Just x -> (i, x + 1) : filter ((/= i).fst) q 
     "stormrebalance" -> do 
-          -- liftIO $ rebalance 89000
+          liftIO $ rebalance 89000
           c <- liftIO $ readIORef circleRef
           lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
     "stormpaths" -> do 
-          paths <- liftIO $ bftFindPaths x y  
+          paths <- liftIO $ findPaths x y  
           lift $ yield $ Res (toJSON paths) i 
           where 
               x = getNodeInt $ getNodeArg 0 p

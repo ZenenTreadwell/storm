@@ -26,6 +26,9 @@ import Data.Char
 import Numeric 
 type Gra = Gr NodeInfo Channel
 type Cxt = Context NodeInfo Channel
+type MCxt = MContext NodeInfo Channel
+type Dcp = (MCxt, Gra) 
+
 
 graphRef :: IORef Gra
 graphRef = unsafePerformIO $ newIORef empty 
@@ -35,9 +38,9 @@ loadGraph = (allchannels) >>= \case
     (Just (Correct (Res listchannels _))) -> (allnodes) >>= \case 
         (Just (Correct (Res listnodes _))) -> do 
             liftIO $ writeIORef graphRef
-                   $ (\g -> (flip subgraph g) . head $ components g )
-                   $ (\g -> foldr (delEdge.toEdge) g $ filter (feeTooHigh.edgeLabel) (labEdges g) ) 
-                   $ gfiltermap traps
+                   -- $ (\g -> (flip subgraph g) . head $ components g )
+                   -- $ (\g -> foldr (delEdge.toEdge) g $ filter (feeTooHigh.edgeLabel) (labEdges g) ) 
+                   -- $ gfiltermap traps
                    $ mkGraph (map toLNode nx) (map toLEdge' cx)
                    where cx = (channels::ListChannels->[Channel]) listchannels 
                          nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
