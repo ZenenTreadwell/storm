@@ -17,7 +17,7 @@ manifest = object [
         , RpcMethod "stormload" "" "Loads graph into memory" Nothing False  
         , RpcMethod "stormnetwork" "" "Return info about nodes stored in memory" Nothing False  
         , RpcMethod "stormrebalance" "" "Init rebalance attempts. Spending cap 89 satoshi." Nothing False 
-        , RpcMethod "stormpaths" "[n1, n2]" "Find shortest path of all in/out pairs, sorted by fee." Nothing False 
+        , RpcMethod "stormpaths" "[n1, n2, a, p]" "Find p paths from n1 to n2 of amount a, sorted by fee." Nothing False 
     ]), 
     "hooks" .= ([
         Hook "invoice_payment" Nothing 
@@ -33,9 +33,7 @@ manifest = object [
         --, Hook "onion_message_blinded" Nothing
         --, Hook "onion_message_ourpath" Nothing 
     ]::[Hook]), 
-    "featurebits" .= object [
-        -- for simpleX video call via micrompayment? 
-    ],
+    "featurebits" .= object [ ],
     "notifications" .= ([]::[Notification]), 
     "subscriptions" .= ([
         "coin_movement"

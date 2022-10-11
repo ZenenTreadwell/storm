@@ -147,14 +147,25 @@ hooks i m p =
           c <- liftIO $ readIORef circleRef
           lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
     "stormpaths" -> do 
-          paths <- liftIO $ findPaths x y  
-          lift $ yield $ Res (toJSON paths) i 
+          paths <- liftIO $ findPaths x y 
+          lift $ yield $ Res (object [ 
+                  "routes" .= (map (createRoute a) $ take w paths)  
+              ]) i
           where 
-              x = getNodeInt $ getNodeArg 0 p
-              y = getNodeInt $ getNodeArg 1 p 
-              getNodeArg i v = case v ^? nth i . _String of
-                  (Just b) -> filter isHexDigit (show b) 
+              x = getNodeInt $ getArgStr 0 p
+              y = getNodeInt $ getArgStr 1 p 
+              a = getArgInt 2 p 1000000
+              w = getArgInt 3 p 1
+                
+              getArgStr :: Int -> Value -> String  
+              getArgStr i v = case v ^? ( (nth i) . _String) of
+                  (Just b) -> show b  
                   Nothing -> ""
+              getArgInt :: Int -> Value -> Int -> Int   
+              getArgInt i v d = case v ^? ( (nth i) . _Integer) of 
+                  Just b -> (fromInteger b)   
+                  Nothing -> d 
+              
     -- UTIL 
     "stormwallet" -> do 
           w <- liftIO wallet

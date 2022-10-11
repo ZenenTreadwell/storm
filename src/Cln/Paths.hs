@@ -38,7 +38,6 @@ instance ToJSON PathInfo where
           "hops" .= hops p
         , "cost" .= cost p
         , "neck" .= neck p
-        , "route" .= createRoute 1000000000 p
         , "channels" .= path p
         ]
 
@@ -88,16 +87,16 @@ findPaths n1 n2 = do
 
 type Sure = (Q.Seq (LPath Channel), [LPath Channel])
 look :: Node 
-     -> Dcp -- :: ( Maybe Cxt , Gra ) 
+     -> Dcp
      -> StateT Sure IO [LPath Channel] 
 look v (Nothing, g) = stop
 look v (Just (ii,nn,nl,oo), g) = get >>= \case 
-    (Empty, []) -> do -- home node
+    (Empty, []) -> do
         put $ (foldr (append (LP []) ) Q.empty oo, [])  
         next v
     (Empty, q) -> stop 
     ( p@(LP l) :<| ax , fin ) ->  
-        if length fin > 1336 then stop 
+        if length fin > 68 then stop 
         else if nn == v then do 
             put $ (ax, p : fin) 
             next v 
@@ -117,7 +116,7 @@ stop :: StateT Sure IO [LPath Channel]
 stop = get >>= \case 
     (_, fin) -> pure fin
 
-
+buildPaths :: [LPath Channel] -> [PathInfo] 
 buildPaths = map (summarizePath . map snd . reverse . unLPath)
 
 summarizePath :: [Channel] -> PathInfo
