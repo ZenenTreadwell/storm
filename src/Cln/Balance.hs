@@ -12,12 +12,15 @@ import System.IO.Unsafe
 import Control.Monad.IO.Class
 import GHC.IORef
 import Control.Concurrent
-import Control.Monad.State
+import Control.Monad.Trans.State.Lazy
+import Control.Monad.IO.Class
 import Data.Graph.Inductive.Graph
 import Data.Ratio
 import Data.List 
 import Data.Maybe
 import Data.Aeson
+import qualified Data.Sequence as Q
+import Data.Sequence( Seq(..) , (<|) , (|>) , (><) ) 
 import qualified Data.Text as T
 import Cln.Types
 import Cln.Client
@@ -41,17 +44,15 @@ genCircles = getinfo >>= \case
                     (a,b,_,d,e) <- pure $ pots
                                         $ filter (isJust.sci)
                                         $ chlf wallet
-                    p <- bftFP g' (matchChannels outy e) (matchChannels inny a)
-                    liftIO $ writeIORef circleRef $ map ((,) []) p
+                    p <- evalStateT (look n' (match n' g))
+                        (foldr (append (LP [])) Q.empty (matchChannels outy e) , [])
+                    liftIO $ writeIORef circleRef $ map ((,) []) (sort $ buildPaths p) 
 
 rebalance :: Msat -> IO ()   
 rebalance max = do 
     p <- liftIO $ readIORef circleRef
     c <- evalStateT (mapM payPath p) max   
     liftIO $ writeIORef circleRef c
-
-getFee :: Maybe ListSendPays -> Int
-getFee _ = 20000
 
 payPath :: Circle -> StateT Msat IO Circle
 payPath c@(a,p) = do 
@@ -65,15 +66,21 @@ payPath c@(a,p) = do
                     phsh = (payment_hash::Invoice->String) invoice
                     psct = (payment_secret::Invoice->String) invoice
                 in do
-                    liftIO $ sendpay r phsh $ psct
-                    ch <- liftIO $ checkHash $ phsh
+                    liftIO $ sendpay r phsh psct
+                    ch <- liftIO $ checkHash phsh
                     case ch of 
                         (Just w) -> do
-                            liftIO $ System.IO.appendFile "/home/o/Desktop/loguy" $ show (max,w) <> "\n" 
-                            if (checkSettled $ payments w) 
+                            liftIO $ System.IO.appendFile "/home/o/.ao/loguy" 
+                                   $  show (checkSettled $ payments w) 
+                                   <> "\n" 
+                                   <> phsh 
+                                   <> "\n" 
+                                   <> msg
+                                   <> "\n" 
+                            if (checkSettled $ payments w)
                                 then put (max-fee)
-                                else pure () 
-                            pure (w:a ,p) 
+                                else pure ()
+                            pure (w:a ,p)
                         otherwise -> pure c
             otherwise -> pure c  
     else pure c

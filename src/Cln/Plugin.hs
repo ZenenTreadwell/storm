@@ -126,7 +126,7 @@ hooks i m p =
           -- p <- liftIO $ readIORef circleRef  
           lift $ yield $ Res (object [
                   "nodes loaded" .= order g
-              --  , "balancing paths" .= length p
+                -- , "balancing paths" .= length p
               ]) i
     "stormnetwork" -> do 
           g <- liftIO $ readIORef graphRef
