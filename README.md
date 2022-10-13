@@ -25,20 +25,22 @@ Move or symlink file storm into .lightning/plugins/
 - tests?
 - ...
 
-##### Files 
+##### Files: 
 - app/Main - executable root; connects conduit to plugin
 - src/Cln/Manifest - plugin configuration
 - src/Cln/Plugin - storm interface, hook and notification actions
 - src/Cln/Conduit - json parser
 - src/Cln/Types - data types from plugin and rpc
 - src/Cln/Client - lightning-rpc wrap functions
+- src/Cln/Paths - pathfinding, route building
+- src/Cln/Wallet - create funds summary
+- src/Cln/Balance !! rebalancer
+
 Client can be tested in gchi`:
 - `\> :l Cln.Client`
 - `\> connectCln "<rpc-file-path>"`
 - `\> getinfo`
-src/Cln/Paths - pathfinding, route building
-Wallet - create funds summary
-Balance !! work in progress
+
 
 ##### Audit Requests
 - /src/Cln/Paths createRoute :: PathInfo :: [Route]
