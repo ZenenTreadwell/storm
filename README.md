@@ -27,25 +27,22 @@ Executable **storm** as core lightning plugin
 
 ##### Files 
 app/Main - executable root; connects conduit to plugin
-src/Cln/Manifest - plugin configuration 
-src/Cln/Plugin - handle storm interface, hooks, and notifications
-src/Cln/Conduit - parser for plugin and rpc 
-src/Cln/Types - core lightning data
-src/Cln/Client - calls to lightning-rpc file
-try in `stack gchi`:
-    \> :l Cln.Client
-    \> connectCln "<rpc-file-path>" 
-    \> getinfo
-src/Cln/Paths - pathfinding, route building 
+- src/Cln/Manifest - plugin configuration
+- src/Cln/Plugin - storm interface, hook and notification actions
+- src/Cln/Conduit - json parser
+- src/Cln/Types - data types from plugin and rpc
+- src/Cln/Client - lightning-rpc wrap functions
+Client can be tested in gchi`:
+- `\> :l Cln.Client`
+- `\> connectCln "<rpc-file-path>"`
+- `\> getinfo`
+src/Cln/Paths - pathfinding, route building
 Wallet - create funds summary
 Balance !! work in progress
 
 ##### Audit Requests
-/src/Cln/Paths 
-createRoute :: PathInfo :: [Route]
-    
-/src/Cln/Balance 
-    - failures from my node on both ends, probably broken
+- /src/Cln/Paths createRoute :: PathInfo :: [Route]
+- /src/Cln/Balance (!! balance attempts failing) 
 
 {
 "alias": "Dagnela 🦄 Hunter",
