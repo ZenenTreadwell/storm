@@ -2,18 +2,18 @@
 
 ##### Install
 haskell stack project
-`stack init`
-`stack build`
+- `stack init`
+- `stack build`
 
 Executable **storm** as core lightning plugin 
-https://lightning.readthedocs.io/PLUGINS.html
+- https://lightning.readthedocs.io/PLUGINS.html
 
 ##### Added Interface
 (i.e $ lightning-cli stormwallet)  
-- stormwallet 
+- stormwallet -- wallet summary
 - stormload -- pre-requirment of following !! 8GB Memory
-- stormnetwork -- storm prunes unrouteable/unreachable nodes and fees over threashold  
-- stormpaths fromid toid -- !! for large nodes can take time : finds shortest path on every out-channel/in-channel 
+- stormnetwork -- network summary  
+- stormpaths fromid toid [amountMsat] [resultNum] -- returns routes   
 - stormrebalance !! max spend 89,000msat (likely fail to spend anything) 
   
 (in progress)
@@ -36,6 +36,7 @@ try in `stack gchi`:
     \> :l Cln.Client
     \> connectCln "<rpc-file-path>" 
     \> getinfo
+src/Cln/Paths - pathfinding, route building 
 Wallet - create funds summary
 Balance !! work in progress
 
@@ -43,11 +44,8 @@ Balance !! work in progress
 /src/Cln/Paths 
 createRoute :: PathInfo :: [Route]
     
-/src/Cln/Rebalance 
-payRoute :: [Route] -> IO String
-    - have only tried on circular routes 
+/src/Cln/Balance 
     - failures from my node on both ends, probably broken
-
 
 {
 "alias": "Dagnela 🦄 Hunter",
