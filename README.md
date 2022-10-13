@@ -5,11 +5,11 @@ haskell stack project
 - `stack init`
 - `stack build`
 
-Executable **storm** as core lightning plugin 
-- https://lightning.readthedocs.io/PLUGINS.html
+Executable **storm** as core lightning plugin, see https://lightning.readthedocs.io/PLUGINS.html
 
-##### Added Interface
-(i.e $ lightning-cli stormwallet)  
+Move or symlink file storm into .lightning/plugins/ 
+
+##### Added Interface (i.e $ lightning-cli stormwallet)  
 - stormwallet -- wallet summary
 - stormload -- pre-requirment of following !! 8GB Memory
 - stormnetwork -- network summary  
@@ -26,7 +26,7 @@ Executable **storm** as core lightning plugin
 - ...
 
 ##### Files 
-app/Main - executable root; connects conduit to plugin
+- app/Main - executable root; connects conduit to plugin
 - src/Cln/Manifest - plugin configuration
 - src/Cln/Plugin - storm interface, hook and notification actions
 - src/Cln/Conduit - json parser
