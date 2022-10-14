@@ -70,13 +70,6 @@ payPath c@(a,p) = do
                     ch <- liftIO $ checkHash phsh
                     case ch of 
                         (Just w) -> do
-                            liftIO $ System.IO.appendFile "/home/o/.ao/loguy" 
-                                   $  show (checkSettled $ payments w) 
-                                   <> "\n" 
-                                   <> phsh 
-                                   <> "\n" 
-                                   <> msg
-                                   <> "\n" 
                             if (checkSettled $ payments w)
                                 then put (max-fee)
                                 else pure ()
@@ -84,7 +77,6 @@ payPath c@(a,p) = do
                         otherwise -> pure c
             otherwise -> pure c  
     else pure c
-    
     where
         f = head.path $ p
         e = last.path $ p
