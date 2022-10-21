@@ -34,20 +34,20 @@ type Attempts = [ ListSendPays ]
 circleRef :: IORef [Circle] 
 circleRef = unsafePerformIO $ newIORef [] 
  
-genCircles :: IO () 
-genCircles = getinfo >>= \case
-    (Just (Correct (Res info  _))) -> do 
-         g <- liftIO $ readIORef graphRef
-         case match (getNodeInt $ __id info) g of 
-            (Just (inny, n',z, outy), g') -> listfunds >>= \case 
-                (Just (Correct (Res wallet _))) -> do
-                    (a,b,_,d,e) <- pure $ pots
-                                        $ filter (isJust.sci)
-                                        $ chlf wallet
-                    p <- evalStateT (look n' (match n' g))
-                        (foldr (append (LP [])) Q.empty (matchChannels outy e) , [])
-                    liftIO $ writeIORef circleRef $ map ((,) []) (sort $ buildPaths p) 
-
+-- genCircles :: IO () 
+-- genCircles = getinfo >>= \case
+--     (Just (Correct (Res info  _))) -> do 
+--          g <- liftIO $ readIORef graphRef
+--          case match (getNodeInt $ __id info) g of 
+--             (Just (inny, n',z, outy), g') -> listfunds >>= \case 
+--                 (Just (Correct (Res wallet _))) -> do
+--                     (a,b,_,d,e) <- pure $ pots
+--                                         $ filter (isJust.sci)
+--                                         $ chlf wallet
+--                     p <- _ 
+--                         (foldr (append (LP [])) Q.empty (matchChannels outy e) , [])
+--                     liftIO $ writeIORef circleRef $ map ((,) []) (sort $ buildPaths p) 
+-- 
 rebalance :: Msat -> IO ()   
 rebalance max = do 
     p <- liftIO $ readIORef circleRef
@@ -63,11 +63,11 @@ payPath c@(a,p) = do
         case ir of    
             (Just (Correct (Res invoice  _))) -> 
                 let
-                    phsh = (payment_hash::Invoice->String) invoice
-                    psct = (payment_secret::Invoice->String) invoice
+                    ph = (payment_hash::Invoice->String) invoice
+                    ps = (payment_secret::Invoice->String) invoice
                 in do
-                    liftIO $ sendpay r phsh psct
-                    ch <- liftIO $ checkHash phsh
+                    liftIO $ sendpay r ph ps
+                    ch <- liftIO $ checkHash ph
                     case ch of 
                         (Just w) -> do
                             if (checkSettled $ payments w)
@@ -78,12 +78,13 @@ payPath c@(a,p) = do
             otherwise -> pure c  
     else pure c
     where
+        r = createRoute size p     
         f = head.path $ p
         e = last.path $ p
-        sf = camt f
-        se = camt e
+        getSize = amount_msat :: Channel -> Msat
+        sf = getSize f
+        se = getSize e
         size = min (div (min sf se) 3 ) (neck p `div` 3) 
-        r = createRoute size p     
         edest = (___id::Route->String).last $ r
         eamt = ramt.last $ r
         isCircle = (==) edest ((source::Channel->String) f)
@@ -131,8 +132,6 @@ sci :: LFChannel -> Maybe String
 sci = short_channel_id
 cci :: Channel -> String
 cci = short_channel_id
-camt :: Channel -> Msat
-camt = amount_msat
 ramt :: Route -> Msat
 ramt = amount_msat
 chlf :: ListFunds->[LFChannel]

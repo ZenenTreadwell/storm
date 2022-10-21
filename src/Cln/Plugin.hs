@@ -147,9 +147,9 @@ hooks i m p =
           c <- liftIO $ readIORef circleRef
           lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
     "stormpaths" -> do 
-          paths <- liftIO $ findPaths x y 
+          paths <- liftIO $ findPathsItr x y w
           lift $ yield $ Res (object [ 
-                  "routes" .= (map (createRoute a) $ take w paths)  
+                  "routes" .= (map (createRoute a) $ paths)  
               ]) i
           where 
               x = getNodeInt $ getArgStr 0 p

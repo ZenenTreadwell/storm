@@ -24,8 +24,8 @@ import Numeric
 import GHC.IORef
 import Data.Function.Flip
 import Data.List
-import Data.Tuple 
-loguy mmm = liftIO $ System.IO.appendFile "/home/o/.ao/loguy" $ mmm <> "\n"
+import Data.Tuple
+import Data.Tree
 
 data PathInfo = P {
       hops :: Int
@@ -79,13 +79,14 @@ createRoute a c = foldr (addHop a) [] $ pairUp $ path c
                 nextAmount = maximum $ map (amount_msat::Route->Msat) r
             in sum [ nextAmount , basefee , ppmfee ]
 
+--bfs that uses queue for frontier 
+type Sure = (Q.Seq (LPath Channel), [LPath Channel])
 findPaths :: Node -> Node -> IO [PathInfo]
 findPaths n1 n2 = do
     gra <- readIORef graphRef
     d   <- evalStateT (look n2 ( match n1 gra ) ) (Q.empty, [])
     pure $ sort $ buildPaths d
 
-type Sure = (Q.Seq (LPath Channel), [LPath Channel])
 look :: Node 
      -> Dcp
      -> StateT Sure IO [LPath Channel] 
@@ -112,9 +113,83 @@ next v = get >>= \case
     otherwise -> do 
         stop
 
-stop :: StateT Sure IO [LPath Channel]
-stop = get >>= \case 
-    (_, fin) -> pure fin
+stop = do 
+    (_, fin) <- get 
+    return fin 
+
+-- attempt that uses (abuses?) fgl shortest path 
+-- 200 out channels/ 200 in channels = 40000 sp
+bftFindPaths :: Node -> Node -> IO [PathInfo]
+bftFindPaths n v = do 
+    gra <- readIORef graphRef
+    case ( match n gra                ,  match v gra) of 
+        ( (Just (_, _, _, outy), g) , (Just (inny, _,_,_) , _ ) ) -> 
+            bftFP g oo ii
+            where oo = filter (\(f, n') -> v /= n') outy  
+                  ii = filter (\(f, n') -> n /= n') inny
+        otherwise -> pure []    
+
+bftFP :: Gra -> Adj Channel -> Adj Channel -> IO [PathInfo]
+bftFP g outy inny = pure
+    $ sort
+    $ map summarizePath   
+    $ map repackPath
+    $ filter (\(_,p,_)-> (length.unLPath) p > 0)
+    $ map (\(a,pf,b) -> (a,pf g, b) )
+    $ concat
+    $ map (finPaths inny) 
+    $ map outTree outy
+
+finPaths :: Adj Channel -> (Channel, Gra -> LRTree Channel) -> [ (Channel, Gra -> LPath Channel, Channel) ] 
+finPaths i outT = map (fp outT) i
+fp :: (Channel, Gra -> LRTree Channel) -> (Channel,Node) -> (Channel, Gra -> LPath Channel, Channel)
+fp (f, t) (e, v) = (f, (getLPath v).t , e) 
+outTree :: (Channel, Node) -> (Channel, Gra -> LRTree Channel) 
+outTree o = (fst o, lbft $ snd o)   
+repackPath :: (Channel, LPath Channel, Channel) -> [Channel]
+repackPath (f,p,e) = [f] <> ((lp.unLPath) p) <> [e]
+lp :: [LNode Channel] -> [Channel]
+lp [] = [] 
+lp (p:px) = map snd px
+
+-- wip (even possible?) 
+-- attempt to not require frontier 
+-- w/ infinite lazy list
+type Sureit2 = (Gra, Node, Node, Cxt, Cxt, LPath Channel) 
+type Sureit = (Gra, Node, Node, Cxt, Cxt) 
+type Suret = (Gra, Node, Node) 
+findPathsItr :: Node -> Node -> Int -> IO [PathInfo] 
+findPathsItr n1 n2 m = do 
+    gra <- readIORef graphRef
+    case match n1 gra of 
+        (Just c0@(ii,nn,nl,x:oo), g) -> pure
+            $ buildPaths
+            $ take m 
+            $ iterate (findit (gra, n1, n2)) (LP []) 
+        otherwise -> pure [] 
+
+findit :: Suret -> (LPath Channel -> LPath Channel)
+findit (g, n1, n2) = \p -> 
+    let c1 = context g n1
+        oo = suc' c1
+        x = head oo 
+        c2 = context g x 
+    in evalState lookit2 (g, n1, n2, c1, c2, p)
+
+lookit2 :: State Sureit2 (LPath Channel)
+lookit2 = do 
+    (g, n1, n2, c1@(ii, nn, nl, oo), (i', n', l', o'), (LP p)) <- get
+    case ( filter ((== n2).snd) o', dropWhile ((== n').snd) oo ) of 
+        ( _ , [] ) -> undefined 
+        ( [], (x:[]) ) -> undefined
+        -- next sub context
+        ( [], (x:y:_) )  -> do 
+            put (g, n1, n2, c1, context g (snd y), LP p) 
+            lookit2 
+        -- new path ily
+        ( (x:_) , (y:_) ) ->  pure $ LP $ (swap x) : (swap y) : p     
+
+
 
 buildPaths :: [LPath Channel] -> [PathInfo] 
 buildPaths = map (summarizePath . map snd . reverse . unLPath)
@@ -131,7 +206,9 @@ summarizePath s@(_:sx) = foldr c2 (initP s) sx
                 otherwise -> min (neck c) ((amount_msat::Channel->Msat) e) 
             )
             (path c)
-        initP p = P (1) (Fee 0 0) maxBound p
+
+initP :: [Channel] -> PathInfo
+initP p = P (1) (Fee 0 0) maxBound p
 
 append :: LPath Channel -> (Channel, Node) -> Q.Seq (LPath Channel) -> Q.Seq (LPath Channel)
 append (LP p) x q = q |> (LP $ (swap x) : p) 

@@ -46,8 +46,3 @@ Client can be tested in gchi`:
 - /src/Cln/Paths createRoute :: PathInfo :: [Route]
 - /src/Cln/Balance (!! balance attempts failing) 
 
-{
-"alias": "Dagnela 🦄 Hunter",
-"id": "0337694505123a12a8fadd95523dcc235898ad3b80a06e4a63ca26fed68dd0d17c",
-"network":"bitcoin"
-}
