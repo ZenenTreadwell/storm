@@ -24,11 +24,12 @@ import Data.List
 import Data.Maybe 
 import Data.Char
 import Numeric 
+
+
 type Gra = Gr NodeInfo Channel
 type Cxt = Context NodeInfo Channel
 type MCxt = MContext NodeInfo Channel
 type Dcp = (MCxt, Gra) 
-
 
 graphRef :: IORef Gra
 graphRef = unsafePerformIO $ newIORef empty 

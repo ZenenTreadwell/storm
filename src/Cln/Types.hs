@@ -58,11 +58,11 @@ data Movement = Movement {
     , vout :: Maybe Int 
     , part_id :: Maybe Int 
     , payment_hash :: Maybe String 
-    , credit :: Maybe String
-    , debit :: Maybe String
+    , credit_msat :: Maybe String
+    , debit_msat :: Maybe String
     , output_msat :: Maybe Int
     , output_count :: Maybe Int 
-    , __fees :: Maybe String
+    , __fees_msat :: Maybe String
     , tags :: [String]
     , blockheight :: Maybe Int 
     , timestamp :: Int 

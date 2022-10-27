@@ -69,8 +69,7 @@ notifications m p = case m of
     "disconnect"             -> pure ()    
     "invoice_payment"        -> case ((fromJSON p) :: Result InvoicePayment ) of
         Success (a)             -> do 
-            liftIO $ System.IO.appendFile "/home/o/Desktop/loguy" $ show a <> "\n"
-            pure () -- recordFwd 
+            pure ()  
         Error x                 -> pure ()                       
     "invoice_creation"       -> pure ()    
     "warning"                -> pure ()    
@@ -78,8 +77,10 @@ notifications m p = case m of
     "sendpay_success"        -> pure ()    
     "sendpay_failure"        -> pure ()    
     "coin_movement"          -> case ((fromJSON p) :: Result CoinMovement ) of 
-        Success (a)             -> pure () -- recordFwd 
-        Error x                 -> pure ()                       
+        Success (a) -> do 
+            liftIO $ System.IO.appendFile "/home/o/Desktop/loguy" $ show a <> "\n"
+            pure ()  
+        Error x    -> pure ()                       
     "balance_snapshot"       -> pure ()
     "openchannel_peer_sigs"  -> pure ()    
     "shutdown"               -> pure ()    
@@ -147,9 +148,9 @@ hooks i m p =
           c <- liftIO $ readIORef circleRef
           lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
     "stormpaths" -> do 
-          paths <- liftIO $ findPathsItr x y w
+          paths <- liftIO $ findPaths x y 
           lift $ yield $ Res (object [ 
-                  "routes" .= (map (createRoute a) $ paths)  
+                  "routes" .= (map (createRoute a) $ take w $ paths)  
               ]) i
           where 
               x = getNodeInt $ getArgStr 0 p

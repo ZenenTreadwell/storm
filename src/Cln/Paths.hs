@@ -9,6 +9,7 @@ import Cln.Types
 import Cln.Client
 import Cln.Graph
 import System.IO
+import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.IO.Class
 import qualified Data.Sequence as Q
@@ -79,7 +80,8 @@ createRoute a c = foldr (addHop a) [] $ pairUp $ path c
                 nextAmount = maximum $ map (amount_msat::Route->Msat) r
             in sum [ nextAmount , basefee , ppmfee ]
 
---bfs that uses queue for frontier 
+--bfs that uses queue for frontier
+-- frontier can grow too large
 type Sure = (Q.Seq (LPath Channel), [LPath Channel])
 findPaths :: Node -> Node -> IO [PathInfo]
 findPaths n1 n2 = do
@@ -97,7 +99,7 @@ look v (Just (ii,nn,nl,oo), g) = get >>= \case
         next v
     (Empty, q) -> stop 
     ( p@(LP l) :<| ax , fin ) ->  
-        if length fin > 68 then stop 
+        if length fin > 901 then stop 
         else if nn == v then do 
             put $ (ax, p : fin) 
             next v 
@@ -118,7 +120,7 @@ stop = do
     return fin 
 
 -- attempt that uses (abuses?) fgl shortest path 
--- 200 out channels/ 200 in channels = 40000 sp
+-- 200 out channels/ 200 in channels = 40,000 shortest paths  
 bftFindPaths :: Node -> Node -> IO [PathInfo]
 bftFindPaths n v = do 
     gra <- readIORef graphRef
@@ -155,46 +157,70 @@ lp (p:px) = map snd px
 -- wip (even possible?) 
 -- attempt to not require frontier 
 -- w/ infinite lazy list
-type Sureit2 = (Gra, Node, Node, Cxt, Cxt, LPath Channel) 
-type Sureit = (Gra, Node, Node, Cxt, Cxt) 
-type Suret = (Gra, Node, Node) 
-findPathsItr :: Node -> Node -> Int -> IO [PathInfo] 
-findPathsItr n1 n2 m = do 
+type SearchMeta = (Gra, Node, Node) -- g/n1/n2 
+
+findPathsItr :: Node -> Node -> Int -> IO [PathInfo]
+findPathsItr n1 n2 m = do
     gra <- readIORef graphRef
-    case match n1 gra of 
-        (Just c0@(ii,nn,nl,x:oo), g) -> pure
-            $ buildPaths
-            $ take m 
-            $ iterate (findit (gra, n1, n2)) (LP []) 
-        otherwise -> pure [] 
+    pure $ buildPaths
+         $ take m
+         $ iterate (pathIter (gra, n1, n2)) (LP []) 
 
-findit :: Suret -> (LPath Channel -> LPath Channel)
-findit (g, n1, n2) = \p -> 
-    let c1 = context g n1
-        oo = suc' c1
-        x = head oo 
-        c2 = context g x 
-    in evalState lookit2 (g, n1, n2, c1, c2, p)
+pathIter :: SearchMeta -> LPath Channel -> LPath Channel
+pathIter m@(g, n1, n2) p = evalState (scan m) p 
 
-lookit2 :: State Sureit2 (LPath Channel)
-lookit2 = do 
-    (g, n1, n2, c1@(ii, nn, nl, oo), (i', n', l', o'), (LP p)) <- get
-    case ( filter ((== n2).snd) o', dropWhile ((== n').snd) oo ) of 
-        ( _ , [] ) -> undefined 
-        ( [], (x:[]) ) -> undefined
-        -- next sub context
-        ( [], (x:y:_) )  -> do 
-            put (g, n1, n2, c1, context g (snd y), LP p) 
-            lookit2 
-        -- new path ily
-        ( (x:_) , (y:_) ) ->  pure $ LP $ (swap x) : (swap y) : p     
+scan :: SearchMeta -> State (LPath Channel) (LPath Channel)
+scan m@(g, n1, n2) = get >>= \case  
+    (LP [] ) -> case filter ((== n2).fst) $ lsuc g n1 of 
+        [] -> do 
+            put $ startOf 1 m (LP []) 
+            scan m 
+        (x:_) -> pure $ LP $ [x] 
+    p@(LP r@((n,ch):rs)) -> 
+        let 
+            sn = getNodeInt $ source' ch 
+            dn = getNodeInt $ destination' ch
+        in if dn == n2 
+            then do 
+                put $ nextPath m (LP rs) 
+                scan m  
+            else do 
+                case filter ((== n2).fst) $ lsuc g n of 
+                    [] -> do   
+                        put $ nextPath m (LP rs)    
+                        scan m
+                    (x:_) -> pure $ LP $ x : r
+        
+nextPath :: SearchMeta -> LPath Channel -> LPath Channel 
+nextPath m (LP []) = startOf 1 m (LP []) 
+nextPath m@(g, n1, n2) (LP p@((n,ch):rs)) = 
+    let lng = length p 
+        sn = getNodeInt $ source' ch 
+        dn = getNodeInt $ destination' ch
+        isSane = dn == n 
+    in case take 1 $ drop 1 $ dropWhile ((/= dn).fst) (lsuc g $ fst $ head rs ) of
+        [] -> startOf (lng + 1) m (LP [])  
+        (x:_) -> LP (x:rs) 
+
+extendR :: Int -> SearchMeta -> LPath Channel-> LPath Channel
+extendR = undefined 
 
 
+startOf :: Int -> SearchMeta -> LPath Channel-> LPath Channel
+startOf 0 _ p = p
+startOf i m@(g, n1, n2) (LP []) = startOf (i-1) m $ LP $ take 1 $ lsuc g n1
+startOf i m@(g, n1, n2) (LP p@(x@(n, _):_)) = LP $ (take 1 $ lsuc g n) <> p
+
+source' :: Channel -> String 
+source' = source
+destination' :: Channel -> String 
+destination' = destination 
 
 buildPaths :: [LPath Channel] -> [PathInfo] 
 buildPaths = map (summarizePath . map snd . reverse . unLPath)
 
 summarizePath :: [Channel] -> PathInfo
+summarizePath [] = initP [] 
 summarizePath s@(_:sx) = foldr c2 (initP s) sx
     where 
         c2 e c = P 
