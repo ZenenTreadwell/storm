@@ -14,10 +14,13 @@ import Cln.Client
 import Cln.Graph 
 import Cln.Paths
 import Cln.Wallet
+import Cln.Route
+import Cln.Search 
 import System.IO
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class 
 import Control.Monad.Trans.State 
+import Control.Monad.Trans.Reader
 import Control.Concurrent (threadDelay)
 import GHC.IORef 
 import System.IO.Unsafe
@@ -77,10 +80,17 @@ notifications m p = case m of
     "sendpay_success"        -> pure ()    
     "sendpay_failure"        -> pure ()    
     "coin_movement"          -> case ((fromJSON p) :: Result CoinMovement ) of 
-        Success (a) -> do 
-            liftIO $ System.IO.appendFile "/home/o/Desktop/loguy" $ show a <> "\n"
+        Success (CoinMovement a) -> do 
+            liftIO $ System.IO.appendFile "/home/o/Desktop/loguy" 
+                   $ (__type :: Movement -> String) a 
+                   <> (concat $ tags a) 
+                   <> " : "
+                   <> (show $ credit_msat a)  
+                   <> (show $ fees_msat a) 
+                   <> "\n"
             pure ()  
-        Error x    -> pure ()                       
+        Error x    -> do 
+            pure ()                       
     "balance_snapshot"       -> pure ()
     "openchannel_peer_sigs"  -> pure ()    
     "shutdown"               -> pure ()    
@@ -143,16 +153,18 @@ hooks i m p =
                      lvls (m, i) q = case lookup i q of 
                         Nothing -> (i, 1) : q 
                         Just x -> (i, x + 1) : filter ((/= i).fst) q 
-    "stormrebalance" -> do 
-          liftIO $ rebalance 89000
-          c <- liftIO $ readIORef circleRef
-          lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
+--    "stormrebalance" -> do 
+--          liftIO $ rebalance 89000
+--          c <- liftIO $ readIORef circleRef
+--          lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
     "stormpaths" -> do 
-          paths <- liftIO $ findPaths x y 
+          g <- liftIO $ readIORef graphRef
           lift $ yield $ Res (object [ 
-                  "routes" .= (map (createRoute a) $ take w $ paths)  
+                  "routes" .= (map (createRoute a) (runReader acdc (g,x,y)) )   
               ]) i
           where 
+              acdc :: Search [Way]   
+              acdc = evalStateT (results w) (Empty,[]) 
               x = getNodeInt $ getArgStr 0 p
               y = getNodeInt $ getArgStr 1 p 
               a = getArgInt 2 p 1000000

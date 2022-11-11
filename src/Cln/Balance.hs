@@ -78,9 +78,9 @@ payPath c@(a,p) = do
             otherwise -> pure c  
     else pure c
     where
-        r = createRoute size p     
-        f = head.path $ p
-        e = last.path $ p
+        r = undefined    
+        f = undefined
+        e = undefined 
         getSize = amount_msat :: Channel -> Msat
         sf = getSize f
         se = getSize e
