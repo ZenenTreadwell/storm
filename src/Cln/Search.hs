@@ -47,7 +47,9 @@ nextRef r ((ii,nn,ll,oo), r', c) =
 
     in if (x == z) 
         then oldHoppy r 
-        else extendTo (length r) $ increment $ Q.take z r 
+        else if 0 == z 
+            then extendTo (length r + 1) Empty
+            else extendTo (length r) $ increment $ Q.take z r 
 
 fetchRef :: Ref -> Search (Either DeRef Way) 
 fetchRef ref = do
