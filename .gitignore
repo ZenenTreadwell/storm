@@ -2,4 +2,6 @@
 stack.yaml
 stack.yaml.lock
 storm.cabal
+*.swp
+*~
 
