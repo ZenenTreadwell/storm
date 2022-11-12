@@ -18,7 +18,6 @@ import Data.Foldable
 type Search = Reader (Gra, Node, Node)  -- from / to
 type Ref = Q.Seq Int
 type Way = Q.Seq Channel 
-
 type DeRef = (Cxt, Ref, Way)
 
 results :: Int -> StateT (Ref, [Way]) Search [Way] 
@@ -26,7 +25,7 @@ results x =
     do 
         (r , c) <- get
         (xo, r') <- lift $ search r
-        put (oldHoppy r', xo : c) 
+        put (increment r', xo : c) 
         if x > length c 
             then results x 
             else return c
@@ -44,7 +43,6 @@ nextRef r ((ii,nn,ll,oo), r', c) =
         x = Q.length r
         y = Q.length r' 
         z = Q.length c 
-
     in if (x == z) 
         then oldHoppy r 
         else if 0 == z 
@@ -67,7 +65,6 @@ getChans = get >>= \case
                 put ( context g n' , t , c |> c' )
                 getChans
 
-
 checkFound :: Way -> Search (Maybe Way) 
 checkFound Empty = do  
     (g,n,v) <- ask
@@ -84,7 +81,7 @@ final a v' = do
         (x:_) -> pure $ Just $ a |> (snd x) 
 
 increment :: Ref -> Ref
-increment Empty = Q.singleton 0 
+increment Empty = Q.singleton 0
 increment (r :|> x) = r |> (x + 1) 
  
 extend :: Ref -> Ref
@@ -95,7 +92,8 @@ chop Empty = Empty
 chop (r :|> _) = r
 
 oldHoppy :: Ref -> Ref
-oldHoppy = extend.increment.chop
+oldHoppy Empty = Q.singleton 0
+oldHoppy r = (extend.increment.chop) r
 
 extendTo :: Int -> Ref -> Ref 
 extendTo x r
