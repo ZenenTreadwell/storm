@@ -13,11 +13,6 @@ import qualified Data.Sequence as Q
 import Data.Sequence(Seq(..),(<|),(|>),(><)) 
 import Data.Foldable 
 
-import System.IO 
-
-logr m = System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
-
-
 type Search = ReaderT (Gra, Node, Node) IO  -- from / to
 type Way = Q.Seq Channel 
 type Ref = Q.Seq Int
@@ -27,7 +22,6 @@ results :: Int -> StateT (Ref, [Way]) Search [Way]
 results x = do 
     (r , c) <- get
     (xo, r') <- lift $ search r
-    lift.lift $ logr $ r'
     put (increment r', xo : c) 
     if x > length c 
         then results x 
@@ -36,11 +30,8 @@ results x = do
 search :: Ref -> Search (Way, Ref)  
 search r = (hydrate r) >>= \case
     (Left x) -> do 
-        lift $ logr $ "failed hydrate" <> show r
         search $ nextr r x
     (Right y) -> do
-        lift $ logr $ "successh "  <> show r 
-        lift $ logr $ map (short_channel_id :: Channel -> String) (toList y)
         (finally y) >>= \case  
             Nothing -> search $ increment r
             (Just y) -> lift $ pure (y, r)  
