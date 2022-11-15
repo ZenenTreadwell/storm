@@ -2,23 +2,26 @@
     LambdaCase, 
     DuplicateRecordFields
 #-} 
-
 module Cln.Search where 
-
 import Cln.Types
 import Cln.Graph
 import Data.Graph.Inductive.Graph
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import Control.Monad.Trans.State.Lazy -- (lazy?) 
+import Control.Monad.Trans.State.Lazy 
 import qualified Data.Sequence as Q
 import Data.Sequence( Seq(..) , (<|) , (|>) , (><)) 
 import Data.Foldable 
 
 type Search = Reader (Gra, Node, Node)  -- from / to
-type Ref = Q.Seq Int
 type Way = Q.Seq Channel 
-type DeRef = (Cxt, Ref, Way)
+
+-- waypoint of search relative to starting node
+-- i.e. [ 0 ] -> 1 hop, first channel
+type Ref = Q.Seq Int
+
+type Deref = (Ref, Way) 
+
 
 results :: Int -> StateT (Ref, [Way]) Search [Way] 
 results x =   
@@ -31,69 +34,66 @@ results x =
             else return c
 
 search :: Ref -> Search (Way, Ref) 
-search ref = (fetchRef ref) >>= \case
-    (Left x) -> search $ nextRef ref x
-    (Right y) -> (checkFound y) >>= \case  
-        Nothing -> search $ increment ref
-        (Just y) -> pure (y, ref)  
+search r = (hydrate r) >>= \case
+    (Left x) -> search $ nextr r x
+    (Right y) -> (finally y) >>= \case  
+        Nothing -> search $ increment r
+        (Just y) -> pure (y, r)  
 
-nextRef :: Ref -> DeRef -> Ref 
-nextRef r ((ii,nn,ll,oo), r', c) = 
+finally :: Way -> Search (Maybe Way) 
+finally w = do 
+    (g, n, v) <- ask 
+    oo <- outgoing w 
+    case filter ((== v).fst) $ oo of 
+        [] -> pure Nothing 
+        (x:_) -> pure $ Just (w |> snd x) 
+
+nextr :: Ref -> Deref -> Ref 
+nextr r (r', c) = 
     let 
         x = Q.length r
         y = Q.length r' 
         z = Q.length c 
     in if (x == z) 
-        then oldHoppy r 
-        else if 0 == z 
+        then extend.increment.chop $ r
+        else if z == 0
             then extendTo (length r + 1) Empty
             else extendTo (length r) $ increment $ Q.take z r 
 
-fetchRef :: Ref -> Search (Either DeRef Way) 
-fetchRef ref = do
-    (g,n,v) <- ask  
-    evalStateT getChans (context g n, ref, Empty) 
-
-getChans :: StateT DeRef Search (Either DeRef Way)
-getChans = get >>= \case 
-    (_, Empty, c) -> pure (Right c) 
-    x@((ii,nn,ll,oo), y :<| t, c) -> do 
-        (g, n, v) <- lift ask
+-- either state failed / or the path of channels
+hydrate :: Ref -> Search (Either Deref Way)
+hydrate r = evalStateT h (r, Empty) 
+    
+h :: StateT Deref Search (Either Deref Way)
+h = get >>= \case 
+    (Empty, c) -> return $ Right c
+    dr@(y :<| t, c) -> do 
+        (g, n, v) <- lift ask 
+        oo <- lift $ outgoing c
         case oo !? y of 
-            Nothing -> pure $ Left x    
-            Just (c', n') -> do 
-                put ( context g n' , t , c |> c' )
-                getChans
+            Nothing -> (pure.Left) dr 
+            (Just (m, x)) -> pure $ Right (c |> x) 
+ 
 
-checkFound :: Way -> Search (Maybe Way) 
-checkFound Empty = do  
-    (g,n,v) <- ask
-    final Empty n    
-checkFound a@(ax :|> b) = 
-    let v' = getNodeInt.(destination :: Channel -> String) $ b 
-    in final a v'  
-
-final :: Way -> Node -> Search (Maybe Way) 
-final a v' = do  
-    (g,n,v) <- ask
-    case (filter ((== v').fst) $ lpre g v) of 
-        [] -> pure Nothing 
-        (x:_) -> pure $ Just $ a |> (snd x) 
+outgoing :: Way -> Search [(Node, Channel)] 
+outgoing Empty = do 
+    (g, n, v) <- ask 
+    pure $ lsuc g n
+outgoing (c :|> d) = do 
+    (g, n, v) <- ask
+    pure $ lsuc g (toNode d) 
 
 increment :: Ref -> Ref
 increment Empty = Q.singleton 0
 increment (r :|> x) = r |> (x + 1) 
- 
 extend :: Ref -> Ref
 extend r = r |> 0
-
 chop :: Ref -> Ref
 chop Empty = Empty 
 chop (r :|> _) = r
 
-oldHoppy :: Ref -> Ref
-oldHoppy Empty = Q.singleton 0
-oldHoppy r = (extend.increment.chop) r
+toNode :: Channel -> Node
+toNode = getNodeInt.(destination :: Channel -> String) 
 
 extendTo :: Int -> Ref -> Ref 
 extendTo x r

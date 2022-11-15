@@ -11,16 +11,12 @@ import Data.Aeson.Types
 
 type Sat = Int 
 type Msat = Int
+
 data Short = Short {
       block :: Int
     , input  :: Int 
     , output :: Int
     } deriving (Show, Generic, Eq)
-data Fee = Fee {
-      base :: Int 
-    , ppm :: Int 
-    } deriving (Show, Generic, Eq)  
-instance ToJSON Fee
 
 --Subscription data
 data BalanceSnapshot = BalanceSnapshot { 

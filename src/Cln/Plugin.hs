@@ -53,11 +53,13 @@ a = await >>= maybe mempty (\case
     InvalidReq -> yield $ Left $ Derp ("Request Error"::Text) Nothing  
     ParseErr -> yield $ Left $ Derp ("Parser Err"::Text) Nothing )
 
-b :: ConduitT (Either (Res Value) (Maybe Id, Method, Params)) (Res Value) IO () 
-b = evalStateT l Nothing
+type Ploog = ConduitT (Either (Res Value) (Maybe Id, Method, Params)) (Res Value) IO () 
+
+b :: Ploog
+b = l 
     where 
-    l = lift await >>= monad 
-    monad (Just( (Left r))) = lift $ yield r  
+    l = await >>= monad 
+    monad (Just( (Left r))) = yield r  
     monad (Just (Right (Nothing, m, p) )) = notifications m p
     monad (Just (Right (Just i, m, p))) = hooks i m p
     monad _ = pure ()
@@ -65,6 +67,7 @@ b = evalStateT l Nothing
 c :: ConduitT (Res Value) S.ByteString IO () 
 c = await >>= maybe mempty (\v -> yield $ L.toStrict $ encode v) 
 
+notifications :: Method -> Value -> Ploog  
 notifications m p = case m of 
     "channel_opened"         -> pure ()    
     "channel_state_changed"  -> pure ()    
@@ -81,13 +84,6 @@ notifications m p = case m of
     "sendpay_failure"        -> pure ()    
     "coin_movement"          -> case ((fromJSON p) :: Result CoinMovement ) of 
         Success (CoinMovement a) -> do 
-            liftIO $ System.IO.appendFile "/home/o/Desktop/loguy" 
-                   $ (__type :: Movement -> String) a 
-                   <> (concat $ tags a) 
-                   <> " : "
-                   <> (show $ credit_msat a)  
-                   <> (show $ fees_msat a) 
-                   <> "\n"
             pure ()  
         Error x    -> do 
             pure ()                       
@@ -96,8 +92,9 @@ notifications m p = case m of
     "shutdown"               -> pure ()    
     otherwise                -> pure ()       
 
+hooks :: Id -> Method -> Value -> Ploog  
 hooks i m p = 
-  let rc = lift $ yield $ Res (object [ "result" .= ("continue"::Text) ]) i 
+  let rc = yield $ Res (object [ "result" .= ("continue"::Text) ]) i 
   in case m of
     "init" -> case fromJSON p :: Result Init of 
         (Success x) ->  do 
@@ -106,7 +103,7 @@ hooks i m p =
                    <> "/" <> (rpc5file.configuration $ x)
             rc
         (Error q) -> rc
-    "getmanifest" -> lift $ yield $ Res manifest i 
+    "getmanifest" -> yield $ Res manifest i 
       
       -- HOOK
     "peer_connected"        -> rc 
@@ -135,13 +132,13 @@ hooks i m p =
           -- liftIO genCircles 
           g <- liftIO $ readIORef graphRef
           -- p <- liftIO $ readIORef circleRef  
-          lift $ yield $ Res (object [
+          yield $ Res (object [
                   "nodes loaded" .= order g
                 -- , "balancing paths" .= length p
               ]) i
     "stormnetwork" -> do 
           g <- liftIO $ readIORef graphRef
-          lift $ yield $ Res (object [
+          yield $ Res (object [
                 "nodes" .= order g 
               , "edges" .= size g
               , "capacity" .= (prettyI (Just ',') $ capacity g 0 )
@@ -159,7 +156,7 @@ hooks i m p =
 --          lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
     "stormpaths" -> do 
           g <- liftIO $ readIORef graphRef
-          lift $ yield $ Res (object [ 
+          yield $ Res (object [ 
                   "routes" .= (map ((createRoute a).toList) $ (runReader acdc (g,x,y)) )   
               ]) i
           where 
@@ -182,6 +179,6 @@ hooks i m p =
     -- UTIL 
     "stormwallet" -> do 
           w <- liftIO wallet
-          lift $ yield $ Res w i 
+          yield $ Res w i 
 
 
