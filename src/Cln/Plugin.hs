@@ -156,8 +156,9 @@ hooks i m p =
 --          lift $ yield $ Res (toJSON (map (toJSON.snd) c)) i
     "stormpaths" -> do 
           g <- liftIO $ readIORef graphRef
+          found <- liftIO $ runReaderT acdc (g,x,y)
           yield $ Res (object [ 
-                  "routes" .= (map ((createRoute a).toList) $ (runReader acdc (g,x,y)) )   
+                  "routes" .= (map ((createRoute a).toList) $ found)   
               ]) i
           where 
               acdc :: Search [Way]   

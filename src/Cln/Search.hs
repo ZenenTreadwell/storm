@@ -13,7 +13,12 @@ import qualified Data.Sequence as Q
 import Data.Sequence(Seq(..),(<|),(|>),(><)) 
 import Data.Foldable 
 
-type Search = Reader (Gra, Node, Node)  -- from / to
+import System.IO 
+
+logr m = System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
+
+
+type Search = ReaderT (Gra, Node, Node) IO  -- from / to
 type Way = Q.Seq Channel 
 type Ref = Q.Seq Int
 type Deref = (Ref, Way) 
@@ -22,17 +27,23 @@ results :: Int -> StateT (Ref, [Way]) Search [Way]
 results x = do 
     (r , c) <- get
     (xo, r') <- lift $ search r
+    lift.lift $ logr $ r'
     put (increment r', xo : c) 
     if x > length c 
         then results x 
         else return c
 
-search :: Ref -> Search (Way, Ref) 
+search :: Ref -> Search (Way, Ref)  
 search r = (hydrate r) >>= \case
-    (Left x) -> search $ nextr r x
-    (Right y) -> (finally y) >>= \case  
-        Nothing -> search $ increment r
-        (Just y) -> pure (y, r)  
+    (Left x) -> do 
+        lift $ logr $ "failed hydrate" <> show r
+        search $ nextr r x
+    (Right y) -> do
+        lift $ logr $ "successh "  <> show r 
+        lift $ logr $ map (short_channel_id :: Channel -> String) (toList y)
+        (finally y) >>= \case  
+            Nothing -> search $ increment r
+            (Just y) -> lift $ pure (y, r)  
 
 finally :: Way -> Search (Maybe Way) 
 finally w = do 
@@ -43,16 +54,11 @@ finally w = do
         (x:_) -> pure $ Just (w |> snd x) 
 
 nextr :: Ref -> Deref -> Ref 
-nextr r (r', c) = 
-    let 
-        x = Q.length r
-        y = Q.length r' 
-        z = Q.length c 
-    in if (x == z) 
-        then extend.increment.chop $ r
-        else if z == 0
-            then extendTo (length r + 1) Empty
-            else extendTo (length r) $ increment $ Q.take z r 
+nextr r (r', c)  
+    | z == Q.length r = extend.increment.chop $ r
+    | z == 0 = extendTo (Q.length r + 1) Empty
+    | otherwise = extendTo (Q.length r) $ increment $ Q.take z r
+    where z = Q.length c
 
 hydrate :: Ref -> Search (Either Deref Way)
 hydrate r = evalStateT h (r, Empty) 
@@ -64,8 +70,8 @@ h = get >>= \case
         (g, n, v) <- lift ask 
         oo <- lift $ outgoing c
         case oo !? y of 
-            Nothing -> (pure.Left) dr 
-            (Just (m, x)) -> pure $ Right (c |> x) 
+            Nothing     -> pure $ Left dr 
+            Just (m, x) -> put (t, c |> x) >> h
  
 outgoing :: Way -> Search [(Node, Channel)] 
 outgoing Empty = do 
@@ -83,15 +89,13 @@ extend r = r |> 0
 chop :: Ref -> Ref
 chop Empty = Empty 
 chop (r :|> _) = r
-
-toNode :: Channel -> Node
-toNode = getNodeInt.(destination :: Channel -> String) 
-
 extendTo :: Int -> Ref -> Ref 
 extendTo x r
     | length r >= x = r 
     | otherwise = extendTo x $ extend r
 
+toNode :: Channel -> Node
+toNode = getNodeInt.(destination :: Channel -> String) 
 -- extra 1.7.12
 xs !? n
   | n < 0     = Nothing
