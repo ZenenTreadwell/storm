@@ -10,28 +10,22 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Lazy 
 import qualified Data.Sequence as Q
-import Data.Sequence( Seq(..) , (<|) , (|>) , (><)) 
+import Data.Sequence(Seq(..),(<|),(|>),(><)) 
 import Data.Foldable 
 
 type Search = Reader (Gra, Node, Node)  -- from / to
 type Way = Q.Seq Channel 
-
--- waypoint of search relative to starting node
--- i.e. [ 0 ] -> 1 hop, first channel
 type Ref = Q.Seq Int
-
 type Deref = (Ref, Way) 
 
-
 results :: Int -> StateT (Ref, [Way]) Search [Way] 
-results x =   
-    do 
-        (r , c) <- get
-        (xo, r') <- lift $ search r
-        put (increment r', xo : c) 
-        if x > length c 
-            then results x 
-            else return c
+results x = do 
+    (r , c) <- get
+    (xo, r') <- lift $ search r
+    put (increment r', xo : c) 
+    if x > length c 
+        then results x 
+        else return c
 
 search :: Ref -> Search (Way, Ref) 
 search r = (hydrate r) >>= \case
@@ -60,7 +54,6 @@ nextr r (r', c) =
             then extendTo (length r + 1) Empty
             else extendTo (length r) $ increment $ Q.take z r 
 
--- either state failed / or the path of channels
 hydrate :: Ref -> Search (Either Deref Way)
 hydrate r = evalStateT h (r, Empty) 
     
@@ -74,7 +67,6 @@ h = get >>= \case
             Nothing -> (pure.Left) dr 
             (Just (m, x)) -> pure $ Right (c |> x) 
  
-
 outgoing :: Way -> Search [(Node, Channel)] 
 outgoing Empty = do 
     (g, n, v) <- ask 
@@ -100,12 +92,10 @@ extendTo x r
     | length r >= x = r 
     | otherwise = extendTo x $ extend r
 
-(!?) :: [a] -> Int -> Maybe a
+-- extra 1.7.12
 xs !? n
   | n < 0     = Nothing
-  | otherwise = foldr findo (const Nothing) xs n
-  where 
-      findo :: a -> (Int -> Maybe a) -> Int -> Maybe a
-      findo x r k = case k of
-          0 -> Just x
-          _ -> r (k-1)
+  | otherwise = foldr (\x r k -> case k of
+                                   0 -> Just x
+                                   _ -> r (k-1)) (const Nothing) xs n
+
