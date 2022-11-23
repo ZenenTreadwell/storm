@@ -5,7 +5,7 @@
     DeriveGeneric, 
     OverloadedStrings
 #-}
-module Cln.Graph where 
+module Storm.Graph where 
 import Cln.Types 
 import Cln.Client
 import Cln.Conduit

@@ -4,13 +4,13 @@
     , OverloadedStrings 
     , DuplicateRecordFields
 #-}
-module Cln.Wallet where 
+module Storm.Wallet where 
 
 import Cln.Client
 import Cln.Types 
 import Cln.Conduit
-import Cln.Graph
-import Cln.Balance 
+import Storm.Graph
+import Storm.Balance 
 import Data.Text.Format.Numbers
 import Data.Aeson
 import Data.Aeson.Key

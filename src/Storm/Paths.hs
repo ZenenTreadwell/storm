@@ -4,7 +4,7 @@
     DeriveGeneric, 
     OverloadedStrings
 #-}
-module Cln.Paths where 
+module Storm.Paths where 
 
 import Cln.Types 
 import GHC.Generics

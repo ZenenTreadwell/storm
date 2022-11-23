@@ -5,7 +5,7 @@
     OverloadedStrings
 #-}
 
-module Cln.Balance where 
+module Storm.Balance where 
 import System.Random
 import System.IO 
 import System.IO.Unsafe
@@ -24,9 +24,9 @@ import Data.Sequence( Seq(..) , (<|) , (|>) , (><) )
 import qualified Data.Text as T
 import Cln.Types
 import Cln.Client
-import Cln.Graph
 import Cln.Conduit
-import Cln.Paths
+import Storm.Graph
+import Storm.Paths
 
 type Circle = (Attempts, PathInfo) 
 type Attempts = [ ListSendPays ]  

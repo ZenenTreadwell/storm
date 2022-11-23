@@ -1,10 +1,12 @@
 {-# LANGUAGE
     LambdaCase, 
-    DuplicateRecordFields
+    DuplicateRecordFields, 
+    TypeSynonymInstances, 
+    FlexibleInstances
 #-} 
-module Cln.Search where 
+module Storm.Search where 
 import Cln.Types
-import Cln.Graph
+import Storm.Graph
 import Data.Graph.Inductive.Graph
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
@@ -85,6 +87,23 @@ extendTo x r
     | length r >= x = r 
     | otherwise = extendTo x $ extend r
 
+--  
+-- compile error ? Ord overlap err?
+-- ghc I wanted it to overlap whats why I wrote it 
+--instance Ord Ref where 
+--    compare Empty Empty = EQ
+--    compare r o = case compare (l r) (l o) of 
+--        EQ -> deeper r o 
+--        GT -> GT
+--        LT -> LT 
+--        where 
+--            l = Q.length
+--            --deeper :: Ref -> Ref -> Ordering  
+--            deeper (a :<| r') (b :<| o') = case compare a b of
+--                EQ -> compare r' o' 
+--                LT -> LT 
+--                GT -> GT 
+        
 toNode :: Channel -> Node
 toNode = getNodeInt.(destination :: Channel -> String) 
 -- extra 1.7.12
