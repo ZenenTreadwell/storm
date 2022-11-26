@@ -27,7 +27,7 @@ type Params = Value
 type Id = Value
 type Method = Text
 
-inConduit :: (FromJSON a) => ConduitT S.ByteString (Fin a) IO ()
+inConduit :: (Monad n) => (FromJSON a) => ConduitT S.ByteString (Fin a) n ()
 inConduit = evalStateT l Nothing
     where 
     l = lift await >>= maybe (lift mempty) (r >=> h)

@@ -18,25 +18,18 @@ import Data.Conduit
 import Cln.Conduit
 import Storm.Graph
 
-rc i = lift $ yield $ Res (object ["result" .= ("continue" :: Text)])  i
-
 
 data Storm = S {
       getClient :: Maybe Handle 
     , getGraph :: Maybe Gra
     } 
+eye = S Nothing Nothing
 
-
-storm (Just i, m, p) = evalStateT (case m of 
-    "getmanifest" -> lift $ yield $ Res manifest i 
-    "init" -> do 
-        case fromJSON p :: Result Init of 
-            (Success x) -> put $ S Nothing Nothing 
-            _ -> pure () 
-        rc i  
-    _ -> rc i) (S Nothing Nothing  )
-
-
+storm :: PReq -> Ploog (StateT Storm IO)  
+storm (Just i, m, p) = case m of 
+    _ -> do 
+        (S a b) <- lift get
+        rc i
 --    "stormload" -> do 
 --          put (undefined) 
 --          g <- get
@@ -85,8 +78,6 @@ storm (Just i, m, p) = evalStateT (case m of
 --          w <- liftIO wallet
 --          yield $ Res w i 
 
-
-storm _ = pure () 
 
 
 manifest :: Value

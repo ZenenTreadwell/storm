@@ -1,7 +1,7 @@
 module Main where
 
 import Cln.Plugin (plugin)
-import Storm.Plug (storm) 
+import Storm.Plug  
 
 main :: IO ()
-main = plugin storm
+main = plugin manifest eye storm

@@ -12,6 +12,7 @@ import Data.Text (Text)
 
 type Sat = Int 
 type Msat = Int
+type Manifest = Value 
 
 data Option = Option {
     name :: Text 
