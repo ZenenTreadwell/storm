@@ -35,20 +35,13 @@ data Storm = S {
       gg :: Gra 
     }
 
-logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ (show m) <> "\n"
 -- identity value / starting state
 eye = S empty
 
 storm :: Pluug Storm -- :)     
 
 -- handle notifications, no yield required
-storm (Nothing, m, v) = case m of 
-    "coin_movement" -> case ((fromJSON v) :: Result CoinMovement ) of 
-        Success (CoinMovement a) -> do
-            logy $ ff a 
-            where ff a = if (fff a > 0) then (show $ fff a) else ""
-                  fff a = maybe 0 id $ fees_msat a
-        _ -> pure ()  
+storm (Nothing, m, v) = pure () 
 
 -- handle custom rpc and hooks - yield required 
 -- use 'rc i' to continue
@@ -119,5 +112,5 @@ manifest = object [
     "featurebits" .= object [ ],
     "hooks" .= ([]::[Hook]),
     "notifications" .= ([]::[Notification]), 
-    "subscriptions" .= ([ "coin_movement" ] ::[Text])     
+    "subscriptions" .= ([] ::[Text])     
     ]
