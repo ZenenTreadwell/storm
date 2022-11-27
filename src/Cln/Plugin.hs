@@ -18,57 +18,56 @@ import Data.Aeson
 import Data.Text (Text)  
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.State.Lazy 
+import Control.Monad.State 
+import Control.Monad.Reader
+import Control.Concurrent (forkIO, threadDelay)
+import Network.Socket
+import Network.Socket as N
 
-type Ploog a = ConduitT (Either (Res Value) PReq) (Res Value) a () 
+type Ploog a = ConduitT (Either (Res Value) PReq) (Res Value) (ReaderT Handle a) () 
 type Pluug a = PReq -> Ploog a
 type PReq = (Maybe Id, Method, Params)
 
 
 logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ (show m) <> "\n"
-
-oop p =  sourceHandle stdin .| inConduit .| a .|  p .| c .| sinkHandle stdout
+oop d =  sourceHandle stdin .| inConduit .| a .|  d .| c .| sinkHandle stdout
+doop p =  forever $ runConduit $ sourceHandle stdin .| inConduit .| (plug p) .| sinkHandle stdout
+plug x = a .| b x .| c 
 
 rc i = yield $ Res (object ["result" .= ("continue" :: Text)]) i  
 
--- plugin :: Manifest -> s -> Pluug (StateT s IO) -> IO ()   
+plugin :: Manifest -> s -> Pluug (StateT s IO) -> IO ()   
 plugin manif s p = do 
-  liftIO $ mapM (flip hSetBuffering NoBuffering) [stdin,stdout] 
-  runConduit $ oop $ do 
-    logy "b4 mano" 
-    (Just (Right (Just i, m, _))) <- await 
-    case m of 
-        "init" -> logy "init????"
-        "getmanifest" -> do 
-            logy i
-            yield $ Res manif i -- hangs 
-            
-            logy "afta mano" 
-        _ -> pure () 
+    liftIO $ mapM (flip hSetBuffering NoBuffering) [stdin,stdout] 
+    runConduit $ oop $ do 
+        (Just (Right (Just i, m, _))) <- await 
+        case m of 
+            "getmanifest" -> do 
+                yield $ Res manif i  
+            _ -> pure () 
+    liftIO $ runConduit $ oop $ do      
+        (Just (Right (Just i, m, v))) <- await 
+        case m of 
+            "init" -> case fromJSON v :: Result Init of
+                (Success x) ->  do
+                    soc <- liftIO $ socket AF_UNIX Stream 0
+                    liftIO $ N.connect soc $ SockAddrUnix $ 
+                        ((lightning5dir::InitConfig -> String).configuration $ x) 
+                        <> "/" <> (rpc5file.configuration $ x)
+                    h <- liftIO $ socketToHandle soc ReadWriteMode
+                    liftIO $ do 
+                        forkIO $ runPlug s p h 
+                    rc i 
+                _ -> logy "no successfou" 
+            _ -> logy "failed no init for you"  
+    test <- threadDelay maxBound -- lol 
+    pure () -- the forkIO thread does not keep app alive 
+    where 
+    runPlug s p h = evalStateT (runReaderT (do 
+        doop p 
+        ) h ) s
 
-  logy "afta mani"  
-  runConduit $ oop $ do      
-    (Just (Right (Just i, m, _))) <- await 
-    case m of 
-        "init" -> do 
-            logy i
-            rc i 
-        _ -> pure () 
-    
-  runPlug s p
-  where 
-    runPlug s p = evalStateT (do 
-        forever $ runConduit 
-                $ sourceHandle stdin
-                .| inConduit
-                .| a
-                .| b p 
-                .| c 
-                .| sinkHandle stdout
-                ) s 
-
-plug :: (Monad n) => Pluug n -> ConduitT (Fin (Req Value)) S.ByteString n () 
-plug x = a .| b x .| c 
+-- plug :: (Monad n) => Pluug n -> ConduitT (Fin (Req Value)) S.ByteString n () 
 
 a :: (Monad n) => ConduitT (Fin (Req Value)) (Either (Res Value) (Maybe Id, Method, Params))  n () 
 a = await >>= maybe mempty (\case  
@@ -76,7 +75,7 @@ a = await >>= maybe mempty (\case
     InvalidReq -> yield $ Left $ Derp ("Request Error"::Text) Nothing  
     ParseErr -> yield $ Left $ Derp ("Parser Err"::Text) Nothing )
 
-b :: (Monad n) => Pluug n -> Ploog n
+-- b :: (Monad n) => Ploog n -> Ploog n
 b p =  await >>= monad 
     where 
     monad (Just(Left r)) = yield r  
@@ -85,4 +84,3 @@ b p =  await >>= monad
 
 c :: (Monad n) => ConduitT (Res Value) S.ByteString n () 
 c = await >>= maybe mempty (\v -> yield $ L.toStrict $ encode v) 
-

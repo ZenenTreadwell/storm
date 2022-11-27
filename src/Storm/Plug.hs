@@ -2,6 +2,7 @@
       OverloadedStrings
     , DuplicateRecordFields
     , DeriveGeneric
+    , FlexibleContexts
 #-} 
 module Storm.Plug where 
 
@@ -17,23 +18,27 @@ import Cln.Client
 import Data.Conduit
 import Cln.Conduit
 import Storm.Graph
-
-
+import Data.Graph.Inductive.Graph
+import Control.Monad.Reader 
 data Storm = S {
-      getClient :: Maybe Handle 
-    , getGraph :: Maybe Gra
+      gg :: Gra 
     } 
-eye = S Nothing Nothing
+eye = S empty
 
-storm :: PReq -> Ploog (StateT Storm IO)  
-storm (Just i, m, p) = case m of 
-    _ -> do 
-        (S a b) <- lift get
-        rc i
---    "stormload" -> do 
---          put (undefined) 
---          g <- get
---          yield $ Res (object [ "nodes loaded" .= order g ]) i
+-- logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ (show m) <> "\n"
+-- storm :: Ploog :: _ -- (StateT Storm IO)  
+storm (Just i, m, v) = do 
+    case m of 
+        "stormload" -> do 
+            h <- lift ask 
+            logy h
+            g <- liftIO $ loadGraph h
+            logy g
+            lift.lift $ put (S g) 
+            logy "yie;d" 
+            yield $ Res (object [ "nodes loaded" .= order g ]) i
+
+
 --    "stormnetwork" -> do 
 --          g <- get
 --          yield $ Res (object [

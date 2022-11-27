@@ -24,32 +24,28 @@ import Data.List
 import Data.Maybe 
 import Data.Char
 import Numeric 
-
+import Cln.Plugin 
 
 type Gra = Gr NodeInfo Channel
 type Cxt = Context NodeInfo Channel
 type MCxt = MContext NodeInfo Channel
 type Dcp = (MCxt, Gra) 
 
-graphRef :: IORef Gra
-graphRef = unsafePerformIO $ newIORef empty 
+-- logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ (show m) <> "\n"
 
-loadGraph :: IO ()
-loadGraph = (allchannels) >>= \case 
-    (Just (Correct (Res listchannels _))) -> (allnodes) >>= \case 
-        (Just (Correct (Res listnodes _))) -> do 
-            liftIO $ writeIORef graphRef
-                   $ mkGraph (map toLNode nx) (map toLEdge' cx)
-                   where cx = (channels::ListChannels->[Channel]) listchannels 
-                         nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
-                         toLNode ni = ( (getNodeInt.nodeid) ni , ni)
-                         toLEdge' c = (
-                           ( getNodeInt.source) c
-                           , (getNodeInt.(destination::Channel->String)) c
-                           , c
-                           )
-        otherwise -> pure () 
-    otherwise -> pure () 
+loadGraph :: Handle -> IO Gra
+loadGraph h = do 
+    logy "ggggg" 
+    a <- newaddr h   
+    logy $ "adasd" <> show a 
+    pure empty 
+    
+
+
+ --                  $ mkGraph (map toLNode nx) (map toLEdge' cx)
+ --                  where cx = (channels::ListChannels->[Channel]) listchannels 
+--                         nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
+--                         toLNode ni = ( (getNodeInt.nodeid) ni , ni)
 
 getNodeInt :: String -> Node
 getNodeInt s = case readHex.filter isHexDigit $ s of 
