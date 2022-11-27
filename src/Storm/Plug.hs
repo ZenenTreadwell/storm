@@ -27,16 +27,24 @@ eye = S empty
 
 -- logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ (show m) <> "\n"
 -- storm :: Ploog :: _ -- (StateT Storm IO)  
-storm (Just i, m, v) = do 
-    case m of 
-        "stormload" -> do 
-            h <- lift ask 
-            logy h
-            g <- liftIO $ loadGraph h
-            logy g
-            lift.lift $ put (S g) 
-            logy "yie;d" 
-            yield $ Res (object [ "nodes loaded" .= order g ]) i
+storm (Nothing, m, v) = case m of 
+    "coin_movement" -> case ((fromJSON v) :: Result CoinMovement ) of 
+        Success (CoinMovement a) -> do
+            logy $ ff a 
+            where ff a = if (fff a > 0) then (show $ fff a) else ""
+                  fff a = maybe 0 id $ fees_msat a
+        _ -> pure ()  
+storm (Just i, m, v) =  case m of 
+    "stormload" -> do 
+        logy "load maybe" 
+        h <- lift ask 
+        logy h
+        rc i 
+        -- g <- liftIO $ loadGraph h
+        -- logy g
+        -- lift.lift $ put (S $ g) 
+        -- (S g') <- lift.lift $ get 
+        -- yield $ Res (object [ "loaded" .= True  , "nodes" .= order g]) i
 
 
 --    "stormnetwork" -> do 

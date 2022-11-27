@@ -33,12 +33,7 @@ type Dcp = (MCxt, Gra)
 
 -- logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ (show m) <> "\n"
 
-loadGraph :: Handle -> IO Gra
-loadGraph h = do 
-    logy "ggggg" 
-    a <- newaddr h   
-    logy $ "adasd" <> show a 
-    pure empty 
+loadGraph h = undefined 
     
 
 

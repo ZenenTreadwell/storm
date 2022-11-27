@@ -28,7 +28,6 @@ type Ploog a = ConduitT (Either (Res Value) PReq) (Res Value) (ReaderT Handle a)
 type Pluug a = PReq -> Ploog a
 type PReq = (Maybe Id, Method, Params)
 
-
 logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ (show m) <> "\n"
 oop d =  sourceHandle stdin .| inConduit .| a .|  d .| c .| sinkHandle stdout
 doop p =  forever $ runConduit $ sourceHandle stdin .| inConduit .| (plug p) .| sinkHandle stdout
