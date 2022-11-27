@@ -33,13 +33,11 @@ type Cln a = IO (Maybe (Fin (Res a)))
 
 idref :: IORef Int
 idref = unsafePerformIO $ newIORef (1 :: Int) 
-clnref :: IORef Handle 
-clnref = unsafePerformIO $ newIORef stderr
-connectCln :: String -> IO ()
+
+connectCln :: String -> IO Handle
 connectCln d = (socket AF_UNIX Stream 0) >>= \soc -> do 
     connect soc $ SockAddrUnix d
-    h <- socketToHandle soc ReadWriteMode
-    writeIORef clnref h
+    socketToHandle soc ReadWriteMode
 
 tick :: (FromJSON a , ToJSON w)=> Handle -> (Maybe Value -> Req w) -> Cln a
 tick h v = do 
@@ -53,6 +51,17 @@ reqToHandle h a = L.hPutStr h $ encode a
 
 newaddr :: Handle -> Cln NewAddr 
 newaddr h =  tick h $ Req ("newaddr"::Text) (object []) 
+
+allnodes :: Handle -> Cln ListNodes
+allnodes h = tick h $ Req ("listnodes"::Text) (object [])
+
+
+allchannels :: Handle -> Cln ListChannels 
+allchannels h =  tick h $ Req ("listchannels"::Text) (object [])
+
+listfunds :: Handle -> Cln ListFunds
+listfunds h = tick h $ Req ("listfunds"::Text) (object [])
+
 
 --b11invoice ::  Msat -> String -> String -> Cln Invoice 
 --b11invoice a l d = tick $ Req ("invoice"::Text) (object [

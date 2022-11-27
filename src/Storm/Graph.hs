@@ -1,4 +1,3 @@
-
 {-# LANGUAGE 
     DuplicateRecordFields, 
     LambdaCase, 
@@ -6,43 +5,30 @@
     OverloadedStrings
 #-}
 module Storm.Graph where 
-import Cln.Types 
-import Cln.Client
-import Cln.Conduit
-import Data.Aeson 
-import Control.Monad
-import System.IO 
-import System.IO.Unsafe
-import GHC.IORef
-import GHC.Generics
-import Control.Monad.IO.Class
-import Data.Graph.Inductive.Graph
-import Data.Graph.Inductive.Query
-import Data.Graph.Inductive.Tree
-import GHC.Real
-import Data.List
-import Data.Maybe 
-import Data.Char
 import Numeric 
-import Cln.Plugin 
+import Cln.Types 
+import Data.Graph.Inductive.Graph
+import Data.Graph.Inductive.Tree
+import Data.Char 
 
 type Gra = Gr NodeInfo Channel
 type Cxt = Context NodeInfo Channel
 type MCxt = MContext NodeInfo Channel
 type Dcp = (MCxt, Gra) 
 
--- logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ (show m) <> "\n"
-
-loadGraph h = undefined 
-    
-
-
- --                  $ mkGraph (map toLNode nx) (map toLEdge' cx)
- --                  where cx = (channels::ListChannels->[Channel]) listchannels 
---                         nx = (_nodes :: ListNodes -> [NodeInfo]) listnodes
---                         toLNode ni = ( (getNodeInt.nodeid) ni , ni)
+loadGraph :: ListChannels -> ListNodes -> Gra 
+loadGraph c n = mkGraph (map toLNode nx) (map toLEdge' cx)
+    where 
+        cx = (channels::ListChannels->[Channel]) c
+        nx = (_nodes :: ListNodes -> [NodeInfo]) n 
+        toLNode ni = ( (getNodeInt.nodeid) ni , ni)
+        toLEdge' c = (
+            ( getNodeInt.source) c
+          , (getNodeInt.(destination::Channel->String)) c
+          , c
+          )
 
 getNodeInt :: String -> Node
 getNodeInt s = case readHex.filter isHexDigit $ s of 
     ([]) -> 0 
-    (x:_)-> fst x 
+    (x:_)-> fst x
