@@ -13,10 +13,13 @@ Storm Rpc Interface (i.e $ lightning-cli stormwallet)
 - stormpaths fromid toid [amountMsat] [resultNum]   
 - (disabled) stormrebalance  
   
-Cln Interface : 
+Create core lightning pluggable executable, see app/Main for full example
 
-main :: IO () 
-main = plugin manifest state app
+main :: IO ()  
+
+main = plugin manifest data app
+
+
 
 
   
