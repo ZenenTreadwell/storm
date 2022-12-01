@@ -32,40 +32,47 @@ import Data.Foldable
 
 -- app data
 data Storm = S {
-      gg :: Gra 
+      gg :: Gra
+    , ci :: [Ref]
+    , fu :: Acc
     }
 
--- identity value / starting state
-eye = S empty
+data Acc = A -- (Ratio, Node) 
+
+-- starting state
+eye = S empty [] A
+
+logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
 
 storm :: Pluug Storm -- :)     
+storm (Nothing, "coin_movement", v) = do 
+    case (fromJSON v :: Result CoinMovement) of 
+        Success (CoinMovement y) -> do 
+            logy $ maybe 0 id $ (fees_msat :: Movement -> Maybe Int) y 
+            -- // st <- lift.lift $ get
+            -- undefined 
+        _ -> pure ()  
+storm (Nothing, m, v) = logy m 
 
--- handle notifications, no yield required
-storm (Nothing, m, v) = pure () 
-
--- handle custom rpc and hooks - yield required 
--- use 'rc i' to continue
-storm (Just i, m, v) =  case m of 
-    "stormload" -> do 
-        h <- lift ask 
-        Just (Correct (Res n _)) <- liftIO $ allnodes h
-        Just (Correct (Res c _)) <- liftIO $ allchannels h
-        lift.lift $ put (S $ loadGraph c n) 
-        (S g') <- lift.lift $ get
-        yield $ Res (object [ "loaded" .= True  , "nodes" .= order g']) i
-    "stormwallet" -> do 
-          h <- lift ask
-          Just (Correct (Res w _)) <- liftIO $ listfunds h 
-          yield $ Res (summarizeFunds w) i 
-    "stormnetwork" -> do 
-          (S g) <- lift.lift $ get
-            
-          yield $ Res (object [
-                "nodes" .= order g 
-              , "edges" .= size g
-              , "capacity" .= (prettyI (Just ',') $ capacity g 0 )
-              ]) i
-              where 
+storm (Just i, "stormload", v) =  do 
+    h <- lift ask 
+    Just (Correct (Res n _)) <- liftIO $ allnodes h
+    Just (Correct (Res c _)) <- liftIO $ allchannels h
+    lift.lift $ put (S (loadGraph c n) [] A) 
+    st <- lift.lift $ get
+    yield $ Res (object [ "loaded" .= True  , "nodes" .= order (gg st)]) i
+storm (Just i, "stormwallet", v) = do 
+    h <- lift ask
+    Just (Correct (Res w _)) <- liftIO $ listfunds h 
+    yield $ Res (summarizeFunds w) i 
+storm (Just i, "stormnetwork", v) = do 
+    st <- lift.lift $ get
+    yield $ Res (object [
+          "nodes" .= order (gg st)  
+        , "edges" .= size (gg st)
+        , "capacity" .= (prettyI (Just ',') $ capacity (gg st) 0 )
+        ]) i
+          where 
                 capacity :: Gra -> Msat -> Msat 
                 capacity g t
                     | isEmpty g = t
@@ -74,14 +81,16 @@ storm (Just i, m, v) =  case m of
                             . (map (amount_msat::Channel -> Msat)) 
                             . (map snd)  
                             . lsuc' -- (outchannels) 
-                            $ n 
-                            ) 
-    "stormpaths" -> do 
-        (S g) <- lift.lift $ get
-        found <- liftIO $ runReaderT (evalStateT (results w) (Empty,[])) (g,x,y)
-        yield $ Res (object [ 
-                  "routes" .= (map ((createRoute a).toList) $ found)   
-              ]) i
+                            $ n )
+                    
+
+
+storm (Just i, "stormpaths", v) = do 
+    st <- lift.lift $ get
+    found <- liftIO $ runReaderT (evalStateT (results w) (Empty,[])) (gg st,x,y)
+    yield $ Res (object [ 
+          "routes" .= (map ((createRoute a).toList) $ found)   
+        ]) i
         where 
               x = getNodeInt $ getArgStr 0 v
               y = getNodeInt $ getArgStr 1 v 
@@ -112,5 +121,5 @@ manifest = object [
     "featurebits" .= object [ ],
     "hooks" .= ([]::[Hook]),
     "notifications" .= ([]::[Notification]), 
-    "subscriptions" .= ([] ::[Text])     
+    "subscriptions" .= (["coin_movement", "forward_event"] ::[Text])     
     ]

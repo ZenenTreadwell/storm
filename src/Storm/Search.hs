@@ -86,30 +86,17 @@ extendTo :: Int -> Ref -> Ref
 extendTo x r
     | length r >= x = r 
     | otherwise = extendTo x $ extend r
-
---  
--- compile error ? Ord overlap err?
--- ghc I wanted it to overlap whats why I wrote it 
---instance Ord Ref where 
---    compare Empty Empty = EQ
---    compare r o = case compare (l r) (l o) of 
---        EQ -> deeper r o 
---        GT -> GT
---        LT -> LT 
---        where 
---            l = Q.length
---            --deeper :: Ref -> Ref -> Ordering  
---            deeper (a :<| r') (b :<| o') = case compare a b of
---                EQ -> compare r' o' 
---                LT -> LT 
---                GT -> GT 
         
 toNode :: Channel -> Node
 toNode = getNodeInt.(destination :: Channel -> String) 
--- extra 1.7.12
-xs !? n
-  | n < 0     = Nothing
-  | otherwise = foldr (\x r k -> case k of
-                                   0 -> Just x
-                                   _ -> r (k-1)) (const Nothing) xs n
 
+-- prior art ~ extra 1.7.12
+-- foldr with 3 arg, voodoo shit
+(!?) :: (Foldable t, Eq b, Num b) => t a -> b -> Maybe a
+(!?) l = foldr voo (const Nothing) l
+voo :: (Eq b, Num b) => a -> (b -> Maybe a) -> b -> Maybe a
+voo x r k -- !?!
+  | k == 0 = Just x
+  | otherwise = r (k-1)
+-- foldr :: Foldable t => (a -> b -> b) -> b -> t a -> b
+-- (const Nothing) :: b -> Maybe a
