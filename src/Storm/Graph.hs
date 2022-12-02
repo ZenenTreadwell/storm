@@ -16,8 +16,8 @@ type Cxt = Context NodeInfo Channel
 type MCxt = MContext NodeInfo Channel
 type Dcp = (MCxt, Gra) 
 
-loadGraph :: ListChannels -> ListNodes -> Gra 
-loadGraph c n = mkGraph (map toLNode nx) (map toLEdge' cx)
+loadGraph :: ListNodes -> ListChannels -> Gra 
+loadGraph n c = mkGraph (map toLNode nx) (map toLEdge' cx)
     where 
         cx = (channels::ListChannels->[Channel]) c
         nx = (_nodes :: ListNodes -> [NodeInfo]) n 

@@ -62,6 +62,9 @@ allchannels h =  tick h $ Req ("listchannels"::Text) (object [])
 listfunds :: Handle -> Cln ListFunds
 listfunds h = tick h $ Req ("listfunds"::Text) (object [])
 
+getinfo :: Handle -> Cln GetInfo 
+getinfo h =  tick h $ Req ("getinfo"::Text) (object [])  
+
 
 --b11invoice ::  Msat -> String -> String -> Cln Invoice 
 --b11invoice a l d = tick $ Req ("invoice"::Text) (object [
@@ -92,8 +95,6 @@ listfunds h = tick h $ Req ("listfunds"::Text) (object [])
 --        , "feeppm" .= p 
 --        ])
 --
---getinfo :: Cln GetInfo 
---getinfo =  tick $ Req ("getinfo"::Text) (object [])  
 --
 --channelsbysource :: String -> Cln ListChannels
 --channelsbysource source =  tick $ Req ("listchannels"::Text) (object [ 

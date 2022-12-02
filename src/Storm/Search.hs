@@ -20,11 +20,11 @@ type Way = Q.Seq Channel
 type Ref = Q.Seq Int
 type Deref = (Ref, Way) 
 
-results :: Int -> StateT (Ref, [Way]) Search [Way] 
+results :: Int -> StateT (Ref, [Ref]) Search [Ref] 
 results x = do 
     (r , c) <- get
-    (xo, r') <- lift $ search r
-    put (increment r', xo : c) 
+    (_, r') <- lift $ search r
+    put (increment.chop $ r', r' : c) 
     if x > length c 
         then results x 
         else return c
@@ -34,17 +34,23 @@ search r = (hydrate r) >>= \case
     (Left x) -> do 
         search $ nextr r x
     (Right y) -> do
-        (finally y) >>= \case  
+        (finally (r, y) ) >>= \case  
             Nothing -> search $ increment r
-            (Just y) -> lift $ pure (y, r)  
+            (Just z) -> lift $ pure z   
 
-finally :: Way -> Search (Maybe Way) 
-finally w = do 
+finally :: (Ref, Way) -> Search (Maybe (Way, Ref)) 
+finally (r, w) = do 
     (g, n, v) <- ask 
     oo <- outgoing w 
-    case filter ((== v).fst) $ oo of 
+    let {
+        f = dropWhile (not.(== v).fst) oo;
+        lo = length oo; 
+        la = length f ;
+        rr = lo - la 
+        }
+    case f of 
         [] -> pure Nothing 
-        (x:_) -> pure $ Just (w |> snd x) 
+        (x:_) -> pure $ Just ( w |> snd x, r  |> rr) 
 
 nextr :: Ref -> Deref -> Ref 
 nextr r (r', c)  
@@ -97,6 +103,6 @@ toNode = getNodeInt.(destination :: Channel -> String)
 voo :: (Eq b, Num b) => a -> (b -> Maybe a) -> b -> Maybe a
 voo x r k -- !?!
   | k == 0 = Just x
-  | otherwise = r (k-1)
+  | otherwise = r $ k-1 
 -- foldr :: Foldable t => (a -> b -> b) -> b -> t a -> b
 -- (const Nothing) :: b -> Maybe a

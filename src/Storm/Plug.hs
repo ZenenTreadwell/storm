@@ -29,38 +29,50 @@ import Data.Text.Format.Numbers
 import Control.Lens hiding ((.=))
 import Data.Aeson.Lens
 import Data.Foldable 
+import Data.Ratio 
 
--- app data
+type Rat = Ratio Int 
+type Acc = (Rat, Node) 
 data Storm = S {
       gg :: Gra
     , ci :: [Ref]
-    , fu :: Acc
+    , fu :: [Acc]
     }
+eye = S empty [] [] 
 
-data Acc = A -- (Ratio, Node) 
+loadAccounts :: [LFChannel] -> [Acc] 
+loadAccounts = map la 
 
--- starting state
-eye = S empty [] A
+loadCircles :: Gra -> Node -> [Acc] -> [Ref]
+loadCircles g me a = undefined 
+
+la :: LFChannel -> Acc 
+la l = (our % tot, n) 
+    where our = our_amount_msat l
+          tot = (amount_msat::LFChannel->Msat) l 
+          n = getNodeInt $ (peer_id::LFChannel->String) l 
+
 
 logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
 
 storm :: Pluug Storm -- :)     
-storm (Nothing, "coin_movement", v) = do 
-    case (fromJSON v :: Result CoinMovement) of 
-        Success (CoinMovement y) -> do 
-            logy $ maybe 0 id $ (fees_msat :: Movement -> Maybe Int) y 
-            -- // st <- lift.lift $ get
-            -- undefined 
-        _ -> pure ()  
-storm (Nothing, m, v) = logy m 
-
+storm (Nothing, "coin_movement", v) = case (fromJSON v :: Result CoinMovement) of 
+    Success (CoinMovement y) -> do 
+        logy $ maybe 0 id $ (fees_msat :: Movement -> Maybe Int) y 
+    _ -> pure ()  
 storm (Just i, "stormload", v) =  do 
     h <- lift ask 
     Just (Correct (Res n _)) <- liftIO $ allnodes h
     Just (Correct (Res c _)) <- liftIO $ allchannels h
-    lift.lift $ put (S (loadGraph c n) [] A) 
-    st <- lift.lift $ get
-    yield $ Res (object [ "loaded" .= True  , "nodes" .= order (gg st)]) i
+    Just (Correct (Res fo _)) <- liftIO $ getinfo h 
+    Just (Correct (Res w _)) <- liftIO $ listfunds h 
+    let {
+        me = getNodeInt $ __id fo ; 
+        g = loadGraph n c ;
+        a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
+        o = loadCircles g me a  }
+    lift.lift $ put $ S g o a 
+    yield $ Res (object [ "loaded" .= True  , "nodes" .= order g]) i
 storm (Just i, "stormwallet", v) = do 
     h <- lift ask
     Just (Correct (Res w _)) <- liftIO $ listfunds h 
@@ -72,24 +84,21 @@ storm (Just i, "stormnetwork", v) = do
         , "edges" .= size (gg st)
         , "capacity" .= (prettyI (Just ',') $ capacity (gg st) 0 )
         ]) i
-          where 
-                capacity :: Gra -> Msat -> Msat 
-                capacity g t
-                    | isEmpty g = t
-                    | otherwise = case matchAny g of
-                        (n, g') -> capacity g' $ t + ( sum 
-                            . (map (amount_msat::Channel -> Msat)) 
-                            . (map snd)  
-                            . lsuc' -- (outchannels) 
-                            $ n )
-                    
-
-
+    where 
+        capacity :: Gra -> Msat -> Msat 
+        capacity g t
+            | isEmpty g = t
+            | otherwise = case matchAny g of
+                (n, g') -> capacity g' $ t + ( sum 
+                    . (map (amount_msat::Channel -> Msat)) 
+                    . (map snd)  
+                    . lsuc' 
+                    $ n )
 storm (Just i, "stormpaths", v) = do 
     st <- lift.lift $ get
     found <- liftIO $ runReaderT (evalStateT (results w) (Empty,[])) (gg st,x,y)
     yield $ Res (object [ 
-          "routes" .= (map ((createRoute a).toList) $ found)   
+          "routes" .= found   
         ]) i
         where 
               x = getNodeInt $ getArgStr 0 v
@@ -104,8 +113,7 @@ storm (Just i, "stormpaths", v) = do
               getArgInt i v d = case v ^? ( (nth i) . _Integer) of 
                   Just b -> (fromInteger b)   
                   Nothing -> d 
-
-
+storm x = logy "unhandled" >> logy x 
 
 manifest :: Value
 manifest = object [
@@ -121,5 +129,7 @@ manifest = object [
     "featurebits" .= object [ ],
     "hooks" .= ([]::[Hook]),
     "notifications" .= ([]::[Notification]), 
-    "subscriptions" .= (["coin_movement", "forward_event"] ::[Text])     
+    "subscriptions" .= (["coin_movement"
+                        -- , "forward_event"
+                        ] ::[Text])     
     ]
