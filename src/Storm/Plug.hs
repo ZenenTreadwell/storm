@@ -96,7 +96,10 @@ storm (Just i, "stormnetwork", v) = do
                     $ n )
 storm (Just i, "stormpaths", v) = do 
     st <- lift.lift $ get
-    found <- liftIO $ runReaderT (evalStateT (results w) (Empty,[])) (gg st,x,y)
+    found <- liftIO $ runReaderT (do 
+        asd <- evalStateT (results w) (Empty,[])
+        traverse id ( map hydrate asd ) 
+        ) (gg st,x,y)
     yield $ Res (object [ 
           "routes" .= found   
         ]) i
