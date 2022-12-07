@@ -28,6 +28,7 @@ dependencies:
 - format-numbers
 - containers
 - random
+- async 
 
 library:
   source-dirs: src

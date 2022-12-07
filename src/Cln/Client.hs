@@ -65,6 +65,9 @@ listfunds h = tick h $ Req ("listfunds"::Text) (object [])
 getinfo :: Handle -> Cln GetInfo 
 getinfo h =  tick h $ Req ("getinfo"::Text) (object [])  
 
+listsendpays :: Handle -> String -> Cln ListSendPays 
+listsendpays h x = tick h $ Req ("listsendpays"::Text) (object [
+        "payment_hash" .=  x ]) 
 
 --b11invoice ::  Msat -> String -> String -> Cln Invoice 
 --b11invoice a l d = tick $ Req ("invoice"::Text) (object [
@@ -79,9 +82,6 @@ getinfo h =  tick h $ Req ("getinfo"::Text) (object [])
 --        , "payment_secret" .= s
 --        ])  
 --
---listsendpays :: String -> Cln ListSendPays 
---listsendpays h = tick $ Req ("listsendpays"::Text) (object [
---        "payment_hash" .=  h ]) 
 --
 --waitsendpay :: String -> Cln WaitSendPay 
 --waitsendpay h =  tick $ Req ("waitsendpay"::Text) (object [

@@ -6,6 +6,7 @@
 #-} 
 module Storm.Search where 
 import Cln.Types
+import Storm.Types 
 import Storm.Graph
 import Data.Graph.Inductive.Graph
 import Control.Monad.Trans.Class
@@ -17,7 +18,6 @@ import Data.Foldable
 
 type Search = ReaderT (Gra, Node, Node) IO  -- from / to
 type Way = Q.Seq Channel 
-type Ref = Q.Seq Int
 type Deref = (Ref, Way) 
 
 results :: Int -> StateT (Ref, [Ref]) Search [Ref] 

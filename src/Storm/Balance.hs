@@ -8,46 +8,67 @@
 module Storm.Balance where 
 import System.Random
 import System.IO 
---import System.IO.Unsafe
---import Control.Monad.IO.Class
---import GHC.IORef
---import Control.Concurrent
---import Control.Monad.Trans.State.Lazy
---import Control.Monad.IO.Class
---import Data.Graph.Inductive.Graph
---import Data.Ratio
---import Data.List 
---import Data.Maybe
---import Data.Aeson
---import qualified Data.Sequence as Q
---import Data.Sequence( Seq(..) , (<|) , (|>) , (><) ) 
---import qualified Data.Text as T
---import Cln.Types
---import Cln.Client
---import Cln.Conduit
---import Storm.Graph
---import Storm.Paths
---
---type Circle = (Attempts, PathInfo) 
---type Attempts = [ ListSendPays ]  
---
---circleRef :: IORef [Circle] 
---circleRef = unsafePerformIO $ newIORef [] 
+
+import Control.Concurrent
+import Control.Concurrent.Async 
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State.Lazy
+import Control.Monad.IO.Class
+
+import Data.Graph.Inductive.Graph
+import Data.Ratio
+import Data.List 
+import Data.Maybe
+import Data.Aeson
+
+import qualified Data.Sequence as Q
+import Data.Sequence( Seq(..) , (<|) , (|>) , (><) ) 
+import qualified Data.Text as T
+
+import Cln.Types
+import Cln.Client
+import Cln.Conduit
+
+import Storm.Graph
+import Storm.Paths
+import Storm.Search 
+import Storm.Types 
+
+type Circle = (Attempts, PathInfo) 
+type Attempts = [ ListSendPays ]  
+
+loadCircles :: Gra -> Node -> [Acc] -> IO [Ref]
+loadCircles g me a = do 
+    rrr <- mapConcurrently (o9 (g, me))
+        $ map snd
+        $ filter (\(r, _) -> r > 0.7) a
+    pure $ concat rrr 
+    where o9 x = over9000 x
+
+
+over9000 :: (Gra, Node) -> Node -> IO [Ref] -- y is this IO 
+over9000 (g, m) n = runReaderT (evalStateT (results 9) (Empty,[])) (g, n, m) 
+
+
+
+
+
 -- 
----- genCircles :: IO () 
----- genCircles = getinfo >>= \case
-----     (Just (Correct (Res info  _))) -> do 
-----          g <- liftIO $ readIORef graphRef
-----          case match (getNodeInt $ __id info) g of 
-----             (Just (inny, n',z, outy), g') -> listfunds >>= \case 
-----                 (Just (Correct (Res wallet _))) -> do
-----                     (a,b,_,d,e) <- pure $ pots
-----                                         $ filter (isJust.sci)
-----                                         $ chlf wallet
-----                     p <- _ 
-----                         (foldr (append (LP [])) Q.empty (matchChannels outy e) , [])
-----                     liftIO $ writeIORef circleRef $ map ((,) []) (sort $ buildPaths p) 
----- 
+--genCircles :: IO () 
+--genCircles = getinfo >>= \case
+--    (Just (Correct (Res info  _))) -> do 
+--         g <- liftIO $ readIORef graphRef
+--         case match (getNodeInt $ __id info) g of 
+--            (Just (inny, n',z, outy), g') -> listfunds >>= \case 
+--                (Just (Correct (Res wallet _))) -> do
+--                    (a,b,_,d,e) <- pure $ pots
+--                                        $ filter (isJust.sci)
+--                                        $ chlf wallet
+--                    p <- _ 
+--                        (foldr (append (LP [])) Q.empty (matchChannels outy e) , [])
+--                    liftIO $ writeIORef circleRef $ map ((,) []) (sort $ buildPaths p) 
+--
 --rebalance :: Msat -> IO ()   
 --rebalance max = do 
 --    p <- liftIO $ readIORef circleRef

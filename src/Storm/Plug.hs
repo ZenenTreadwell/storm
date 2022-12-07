@@ -7,8 +7,10 @@
 module Storm.Plug where 
 
 import Storm.Wallet 
-import Storm.Search 
+import Storm.Search
+import Storm.Balance 
 import Storm.Graph
+import Storm.Types 
 
 import Cln.Conduit
 import Cln.Types 
@@ -25,14 +27,14 @@ import Data.Conduit
 import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.Query
 import Control.Monad.Reader 
+import Control.Concurrent hiding (yield)
+
 import Data.Text.Format.Numbers
 import Control.Lens hiding ((.=))
 import Data.Aeson.Lens
 import Data.Foldable 
 import Data.Ratio 
 
-type Rat = Ratio Int 
-type Acc = (Rat, Node) 
 data Storm = S {
       gg :: Gra
     , ci :: [Ref]
@@ -43,15 +45,11 @@ eye = S empty [] []
 loadAccounts :: [LFChannel] -> [Acc] 
 loadAccounts = map la 
 
-loadCircles :: Gra -> Node -> [Acc] -> [Ref]
-loadCircles g me a = undefined 
-
 la :: LFChannel -> Acc 
 la l = (our % tot, n) 
     where our = our_amount_msat l
           tot = (amount_msat::LFChannel->Msat) l 
           n = getNodeInt $ (peer_id::LFChannel->String) l 
-
 
 logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
 
@@ -70,7 +68,8 @@ storm (Just i, "stormload", v) =  do
         me = getNodeInt $ __id fo ; 
         g = loadGraph n c ;
         a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
-        o = loadCircles g me a  }
+         }
+    o <- liftIO $ loadCircles g me a
     lift.lift $ put $ S g o a 
     yield $ Res (object [ "loaded" .= True  , "nodes" .= order g]) i
 storm (Just i, "stormwallet", v) = do 
@@ -83,6 +82,7 @@ storm (Just i, "stormnetwork", v) = do
           "nodes" .= order (gg st)  
         , "edges" .= size (gg st)
         , "capacity" .= (prettyI (Just ',') $ capacity (gg st) 0 )
+        , "circles" .= (length $ ci st) 
         ]) i
     where 
         capacity :: Gra -> Msat -> Msat 
@@ -98,7 +98,8 @@ storm (Just i, "stormpaths", v) = do
     st <- lift.lift $ get
     found <- liftIO $ runReaderT (do 
         asd <- evalStateT (results w) (Empty,[])
-        traverse id ( map hydrate asd ) 
+        asb <- traverse id (map hydrate asd) 
+        pure $ zip asd asb  
         ) (gg st,x,y)
     yield $ Res (object [ 
           "routes" .= found   

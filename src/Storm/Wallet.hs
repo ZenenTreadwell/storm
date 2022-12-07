@@ -11,15 +11,13 @@ import Cln.Types
 import Cln.Conduit
 import Storm.Graph
 import Storm.Balance 
+-- import Storm.Types 
 import Data.Text.Format.Numbers
 import Data.Aeson
 import Data.Aeson.Key
 import Data.Maybe
 import Data.Graph.Inductive.Graph
 import Data.Ratio 
-
-
-
 
 summarizeFunds :: ListFunds -> Value 
 summarizeFunds j = object [
