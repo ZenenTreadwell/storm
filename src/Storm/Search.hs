@@ -5,13 +5,18 @@
     FlexibleInstances
 #-} 
 module Storm.Search where 
+import System.IO 
 import Cln.Types
 import Storm.Types 
 import Storm.Graph
 import Data.Graph.Inductive.Graph
+import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Lazy 
+import Control.Concurrent
+import Control.Concurrent.Async
+import Control.Concurrent.Chan
 import qualified Data.Sequence as Q
 import Data.Sequence(Seq(..),(<|),(|>),(><)) 
 import Data.Foldable 
@@ -20,14 +25,13 @@ type Search = ReaderT (Gra, Node, Node) IO  -- from / to
 type Way = Q.Seq Channel 
 type Deref = (Ref, Way) 
 
-results :: Int -> StateT (Ref, [Ref]) Search [Ref] 
-results x = do 
+loop :: StateT (Ref, Chan Ref) Search () 
+loop = do 
     (r , c) <- get
     (_, r') <- lift $ search r
-    put (increment.chop $ r', r' : c) 
-    if x > length c 
-        then results x 
-        else return c
+    liftIO $ writeChan c r'
+    put (increment.chop $ r', c) 
+    loop 
 
 search :: Ref -> Search (Way, Ref)  
 search r = (hydrate r) >>= \case

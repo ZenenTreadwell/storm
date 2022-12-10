@@ -39,16 +39,35 @@ type Circle = (Attempts, PathInfo)
 type Attempts = [ ListSendPays ]  
 
 loadCircles :: Gra -> Node -> [Acc] -> IO [Ref]
-loadCircles g me a = do 
-    rrr <- mapConcurrently (o9 (g, me))
-        $ map snd
-        $ filter (\(r, _) -> r > 0.7) a
-    pure $ concat rrr 
-    where o9 x = over9000 x
+loadCircles g me a =
+
+    let outs :: [Node]
+        outs = map snd $ filter (\(r, _) -> r > 0.7) a
+        gather :: Chan Ref -> IO [Ref]
+        gather = getChanContents 
+        spoon :: Chan Ref -> Node -> IO () 
+        spoon c oot = runReaderT (evalStateT loop (Empty, c)) (g, oot, me)
+            
+    in do
+        c <- newChan 
+        threads <- mapConcurrently (\oo -> forkIO (spoon c oo) ) outs
+        threadDelay $ (10 ^ 6) * 3
+        mapM killThread threads
+        getChanContents c
+         
 
 
-over9000 :: (Gra, Node) -> Node -> IO [Ref] -- y is this IO 
-over9000 (g, m) n = runReaderT (evalStateT (results 9) (Empty,[])) (g, n, m) 
+
+
+
+
+
+
+
+
+
+
+
 
 
 

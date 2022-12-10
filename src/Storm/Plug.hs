@@ -68,10 +68,18 @@ storm (Just i, "stormload", v) =  do
         me = getNodeInt $ __id fo ; 
         g = loadGraph n c ;
         a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
+        -- o = [] 
          }
+    logy $ "got graph?" 
     o <- liftIO $ loadCircles g me a
+    logy "got milk" 
     lift.lift $ put $ S g o a 
-    yield $ Res (object [ "loaded" .= True  , "nodes" .= order g]) i
+    logy "got attitude" 
+    yield $ Res (object [ 
+          "loaded" .= True
+        ,  "nodes" .= order g
+        , "circles" .= length o
+            ]) i
 storm (Just i, "stormwallet", v) = do 
     h <- lift ask
     Just (Correct (Res w _)) <- liftIO $ listfunds h 
@@ -97,7 +105,7 @@ storm (Just i, "stormnetwork", v) = do
 storm (Just i, "stormpaths", v) = do 
     st <- lift.lift $ get
     found <- liftIO $ runReaderT (do 
-        asd <- evalStateT (results w) (Empty,[])
+        asd <- lift $ undefined -- liftIO results -- (Empty, []) 
         asb <- traverse id (map hydrate asd) 
         pure $ zip asd asb  
         ) (gg st,x,y)
