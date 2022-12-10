@@ -2,7 +2,8 @@
     DuplicateRecordFields, 
     LambdaCase, 
     DeriveGeneric, 
-    OverloadedStrings
+    OverloadedStrings, 
+    BangPatterns
 #-}
 
 module Storm.Balance where 
@@ -15,6 +16,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Lazy
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 
 import Data.Graph.Inductive.Graph
 import Data.Ratio
@@ -39,23 +41,37 @@ type Circle = (Attempts, PathInfo)
 type Attempts = [ ListSendPays ]  
 
 loadCircles :: Gra -> Node -> [Acc] -> IO [Ref]
-loadCircles g me a =
-
+loadCircles !g me a =
     let outs :: [Node]
         outs = map snd $ filter (\(r, _) -> r > 0.7) a
-        gather :: Chan Ref -> IO [Ref]
-        gather = getChanContents 
-        spoon :: Chan Ref -> Node -> IO () 
-        spoon c oot = runReaderT (evalStateT loop (Empty, c)) (g, oot, me)
-            
+        spoon :: Int -> Chan Ref -> Node -> IO () 
+        spoon q c oot = runReaderT (evalStateT loop (q, Empty, c)) (g, oot, me)
     in do
         c <- newChan 
-        threads <- mapConcurrently (\oo -> forkIO (spoon c oo) ) outs
+        threads <- mapConcurrently (\o ->
+            let   oo = suc g me 
+                  le = dropWhile (not.(== o)) oo
+                  la = length le
+                  lo = length oo
+                  q  = lo - la 
+            in forkIO (spoon q c o) 
+            ) outs
         threadDelay $ (10 ^ 6) * 3
         mapM killThread threads
-        getChanContents c
-         
+        xd <- getChanContents c -- hung (but threads work & get killed) 
+                                -- chan must be empty but why
+        pure xd 
 
+
+loop :: StateT (Int, Ref, Chan Ref) Search () 
+loop = do 
+    me <- liftIO $ myThreadId
+    (q, r , c) <- get
+    (_, r') <- lift $ search r
+    liftIO $ writeChan c (q <| r') 
+    liftIO $ System.IO.appendFile ("/home/o/.ao/" <> (show me)) $ "to chan " <> show (q <| r') 
+    put (q, increment.chop $ r', c) 
+    loop 
 
 
 

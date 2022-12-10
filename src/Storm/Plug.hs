@@ -67,17 +67,17 @@ storm (Just i, "stormload", v) =  do
     let {
         me = getNodeInt $ __id fo ; 
         g = loadGraph n c ;
+        ord = order g ; 
         a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
         -- o = [] 
          }
-    logy $ "got graph?" 
     o <- liftIO $ loadCircles g me a
     logy "got milk" 
     lift.lift $ put $ S g o a 
     logy "got attitude" 
     yield $ Res (object [ 
           "loaded" .= True
-        ,  "nodes" .= order g
+        ,  "nodes" .= ord
         , "circles" .= length o
             ]) i
 storm (Just i, "stormwallet", v) = do 

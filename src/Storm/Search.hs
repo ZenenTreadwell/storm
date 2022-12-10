@@ -25,13 +25,6 @@ type Search = ReaderT (Gra, Node, Node) IO  -- from / to
 type Way = Q.Seq Channel 
 type Deref = (Ref, Way) 
 
-loop :: StateT (Ref, Chan Ref) Search () 
-loop = do 
-    (r , c) <- get
-    (_, r') <- lift $ search r
-    liftIO $ writeChan c r'
-    put (increment.chop $ r', c) 
-    loop 
 
 search :: Ref -> Search (Way, Ref)  
 search r = (hydrate r) >>= \case
