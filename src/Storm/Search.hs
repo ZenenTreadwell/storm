@@ -25,6 +25,14 @@ type Search = ReaderT (Gra, Node, Node) IO  -- from / to
 type Way = Q.Seq Channel 
 type Deref = (Ref, Way) 
 
+results :: Int -> StateT (Ref, [Ref]) Search [Ref] 
+results x = do 
+    (r , c) <- get
+    (_, r') <- lift $ search r
+    put (increment.chop $ r', r' : c) 
+    if x > length c 
+        then results x 
+        else return c
 
 search :: Ref -> Search (Way, Ref)  
 search r = (hydrate r) >>= \case

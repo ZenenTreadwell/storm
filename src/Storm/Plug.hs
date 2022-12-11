@@ -69,12 +69,9 @@ storm (Just i, "stormload", v) =  do
         g = loadGraph n c ;
         ord = order g ; 
         a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
-        -- o = [] 
          }
     o <- liftIO $ loadCircles g me a
-    logy "got milk" 
     lift.lift $ put $ S g o a 
-    logy "got attitude" 
     yield $ Res (object [ 
           "loaded" .= True
         ,  "nodes" .= ord
@@ -104,10 +101,7 @@ storm (Just i, "stormnetwork", v) = do
                     $ n )
 storm (Just i, "stormpaths", v) = do 
     st <- lift.lift $ get
-    found <- liftIO $ runReaderT (do 
-        asd <- lift $ undefined -- liftIO results -- (Empty, []) 
-        asb <- traverse id (map hydrate asd) 
-        pure $ zip asd asb  
+    found <- liftIO $ runReaderT ( evalStateT (results w) (Empty,[]) 
         ) (gg st,x,y)
     yield $ Res (object [ 
           "routes" .= found   
