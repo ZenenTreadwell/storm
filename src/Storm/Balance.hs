@@ -10,8 +10,13 @@ module Storm.Balance where
 import System.Random
 import System.IO 
 
+import GHC.Conc
 import Control.Concurrent
 import Control.Concurrent.Async 
+-- import Control.Concurrent.STM
+-- import Control.Concurrent.Chan
+import Control.Concurrent.STM.TChan
+
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Lazy
@@ -39,15 +44,16 @@ import Storm.Types
 
 type Circle = (Attempts, PathInfo) 
 type Attempts = [ ListSendPays ]  
+type Cha = TChan Ref
 
 loadCircles :: Gra -> Node -> [Acc] -> IO [Ref]
 loadCircles !g me a =
     let outs :: [Node]
         outs = map snd $ filter (\(r, _) -> r > 0.7) a
-        spoon :: Int -> Chan Ref -> Node -> IO () 
+        spoon :: Int -> Cha -> Node -> IO () 
         spoon q c oot = runReaderT (evalStateT loop (q, Empty, c)) (g, oot, me)
     in do
-        c <- newChan 
+        c <- newTChanIO 
         threads <- mapConcurrently (\o ->
             let   oo = suc g me 
                   le = dropWhile (not.(== o)) oo
@@ -56,27 +62,41 @@ loadCircles !g me a =
                   q  = lo - la 
             in forkIO (spoon q c o) 
             ) outs
-        threadDelay $ (10 ^ 6) * 3
+        threadDelay $ (10 ^ 6) * 300
         mapM killThread threads
-        xd <- getChanContents c -- hung (but threads work & get killed) 
-                                -- chan must be empty but why
+        xd <- atomically $ collect c []
         pure xd 
 
-
-loop :: StateT (Int, Ref, Chan Ref) Search () 
+loop :: StateT (Int, Ref, Cha) Search () 
 loop = do 
     me <- liftIO $ myThreadId
-    (q, r , c) <- get
+    (q, r, c) <- get
     (_, r') <- lift $ search r
-    liftIO $ writeChan c (q <| r') 
-    liftIO $ System.IO.appendFile ("/home/o/.ao/" <> (show me)) $ "to chan " <> show (q <| r') 
+    liftIO $ atomically $ writeTChan c (q <| r') 
+    liftIO $ System.IO.appendFile ("/home/o/.ao/loop" <> (drop 9 $ show me)) $ "to chan " <> show (q <| r') <> "\n"
     put (q, increment.chop $ r', c) 
     loop 
 
 
+collect c x = (tryReadTChan c) >>= \case 
+    Nothing -> pure x
+    Just y -> collect c (y : x) 
 
 
-
+--
+--foople = do 
+--    c <- newTChan
+--    threads <- _ $ mapConcurrently (\ii -> forkIO $ atomically $ (evalStateT foop (ii, c))) [1 .. 88]
+--    liftIO $ threadDelay $ (10 ^ 6) * 30
+--    liftIO $ mapM killThread threads
+--    collect c [] 
+--
+---- foop :: StateT (Int, TChan Int) STM ()
+--foop = do 
+--    (i, c) <- get
+--    put (i + 5, c)
+--    lift $ writeTChan c i 
+--
 
 
 

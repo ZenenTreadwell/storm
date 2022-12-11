@@ -29,6 +29,7 @@ dependencies:
 - containers
 - random
 - async 
+- stm 
 
 library:
   source-dirs: src
