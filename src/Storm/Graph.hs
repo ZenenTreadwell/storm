@@ -8,7 +8,9 @@ module Storm.Graph where
 import Numeric 
 import Cln.Types 
 import Data.Graph.Inductive.Graph
-import Data.Graph.Inductive.Tree
+
+import Data.Graph.Inductive.PatriciaTree
+--import Data.Graph.Inductive.Tree
 import Data.Char 
 
 type Gra = Gr NodeInfo Channel
