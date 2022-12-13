@@ -5,6 +5,9 @@ haskell stack project
 - `stack init`
 - `stack build`
 
+Following lightningd option required: 
+allow-deprecated-apis=false
+
 Executable **storm** is [cln plugin](https://lightning.readthedocs.io/PLUGINS.html)
 Storm Rpc Interface (i.e $ lightning-cli stormwallet)  
 - stormwallet
