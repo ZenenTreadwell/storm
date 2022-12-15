@@ -69,6 +69,12 @@ listsendpays :: Handle -> String -> Cln ListSendPays
 listsendpays h x = tick h $ Req ("listsendpays"::Text) (object [
         "payment_hash" .=  x ]) 
 
+multifundchannel :: Handle -> Destinations -> Cln MultiFundChannel
+multifundchannel h d = tick h $ Req ("multifundchannel"::Text) (object [
+      "destinations" .= d 
+    , "feerate" .= ("slow"::Text) ]) 
+
+
 --b11invoice ::  Msat -> String -> String -> Cln Invoice 
 --b11invoice a l d = tick $ Req ("invoice"::Text) (object [
 --          "amount_msat" .= a 

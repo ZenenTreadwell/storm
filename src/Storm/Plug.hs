@@ -11,6 +11,7 @@ import Storm.Search
 import Storm.Balance 
 import Storm.Graph
 import Storm.Types 
+import Storm.Deploy
 
 import Cln.Conduit
 import Cln.Types 
@@ -35,12 +36,14 @@ import Data.Aeson.Lens
 import Data.Foldable 
 import Data.Ratio 
 
+
 data Storm = S {
-      gg :: Gra
+      me :: Node
+    , gg :: Gra
     , ci :: [Ref]
     , fu :: [Acc]
     }
-eye = S empty [] [] 
+eye = S 0 empty [] [] 
 
 loadAccounts :: [LFChannel] -> [Acc] 
 loadAccounts = map la 
@@ -65,13 +68,13 @@ storm (Just i, "stormload", v) =  do
     Just (Correct (Res fo _)) <- liftIO $ getinfo h 
     Just (Correct (Res w _)) <- liftIO $ listfunds h 
     let {
-        me = getNodeInt $ __id fo ; 
+        m = getNodeInt $ __id fo ; 
         g = loadGraph n c ;
         ord = order g ; 
         a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
          }
-    o <- liftIO $ loadCircles g me a
-    lift.lift $ put $ S g o a 
+    o <- liftIO $ loadCircles g m a
+    lift.lift $ put $ S m g o a 
     yield $ Res (object [ 
           "loaded" .= True
         ,  "nodes" .= ord
@@ -99,6 +102,15 @@ storm (Just i, "stormnetwork", v) = do
                     . (map snd)  
                     . lsuc' 
                     $ n )
+storm (Just i, "stormdeploy", v) = do
+    (S me g _ _) <- lift.lift $ get
+    h <- lift ask 
+    Just (Correct (Res w _)) <- liftIO $ listfunds h 
+    Just (Correct (Res ww _)) <- liftIO $ multifundchannel h $ deploy (outputs w) g me
+    yield $ Res (object ["test" .= ww ]) i 
+    
+        
+
 storm (Just i, "stormpaths", v) = do 
     st <- lift.lift $ get
     found <- liftIO $ runReaderT ( evalStateT (results w) (Empty,[]) 
@@ -129,7 +141,8 @@ manifest = object [
         , RpcMethod "stormload" "" "Load into memory (deprecating)" Nothing False  
         , RpcMethod "stormnetwork" "" "network summary info" Nothing False  
         , RpcMethod "stormpaths" "[n1, n2, a, p]" "Find p paths from n1 to n2 of amount a" Nothing False
-        -- , RpcMethod "stormrebalance" "" "rebalance attempts !!WARN!! possble 89 sat" Nothing False 
+        , RpcMethod "stormdeploy" "" "multiopen" Nothing False    
+       -- , RpcMethod "stormrebalance" "" "rebalance attempts !!WARN!! possble 89 sat" Nothing False 
         ]),
     "options" .= ([]::[Option]),
     "featurebits" .= object [ ],
