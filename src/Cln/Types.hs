@@ -449,13 +449,36 @@ data MultiFundChannel = MFC {
       tx :: String 
     , txid :: String 
     , channel_ids :: [Chany]
-    , failed :: Maybe Value 
+    , failed :: Maybe [WhyFail] 
     } deriving (Show, Generic, Eq) 
 instance FromJSON MultiFundChannel where 
     parseJSON v = genericParseJSON defaultOptions{
           fieldLabelModifier = dropWhile (=='_')
         , omitNothingFields = True } v
 instance ToJSON MultiFundChannel
+
+data WhyFail = WF {
+    ____id :: String, 
+    method :: String, 
+    __error :: ErrrCode
+    }deriving (Show, Generic, Eq)
+
+instance FromJSON WhyFail where 
+    parseJSON v = genericParseJSON defaultOptions{
+          fieldLabelModifier = dropWhile (=='_')
+        , omitNothingFields = True } v
+instance ToJSON WhyFail
+
+data ErrrCode = EC {
+    code :: Int, 
+    message :: String, 
+    __data :: String
+    }deriving (Show, Generic, Eq)
+instance FromJSON ErrrCode where 
+    parseJSON v = genericParseJSON defaultOptions{
+          fieldLabelModifier = dropWhile (=='_')
+        , omitNothingFields = True } v
+instance ToJSON ErrrCode 
 
 data Chany = Chany {
       ____id :: String 
@@ -472,9 +495,20 @@ instance ToJSON Chany
 
 type Destinations = [Desti] 
 data Desti = Desti { 
-      _______id :: String 
+      ___________id :: String 
     , amount :: Sat 
     }deriving (Show, Generic, Eq) 
 instance ToJSON Desti where 
     toJSON v = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v 
+
+data Connect' = Connect' {
+      ______id :: String 
+    , features :: String 
+    , direction :: String 
+    -- , addr :: Value 
+    }deriving (Show, Generic, Eq)
+instance FromJSON Connect' where 
+    parseJSON v = genericParseJSON defaultOptions{
+          fieldLabelModifier = dropWhile (=='_')
+        , omitNothingFields = True } v
 

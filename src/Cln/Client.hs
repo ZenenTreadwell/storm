@@ -8,6 +8,7 @@
 
 module Cln.Client where 
 
+
 import Cln.Conduit
 import Cln.Types
 import System.IO
@@ -72,8 +73,12 @@ listsendpays h x = tick h $ Req ("listsendpays"::Text) (object [
 multifundchannel :: Handle -> Destinations -> Cln MultiFundChannel
 multifundchannel h d = tick h $ Req ("multifundchannel"::Text) (object [
       "destinations" .= d 
-    , "feerate" .= ("slow"::Text) ]) 
+    , "feerate" .= ("slow"::Text) 
+    , "minchannels" .= (3 * (div (Prelude.length d) 4)) ]
+    ) 
 
+connect' :: Handle -> String -> Cln Connect' 
+connect' h s = tick h $ Req ("connect"::Text) (object [ "id" .= s ]) 
 
 --b11invoice ::  Msat -> String -> String -> Cln Invoice 
 --b11invoice a l d = tick $ Req ("invoice"::Text) (object [

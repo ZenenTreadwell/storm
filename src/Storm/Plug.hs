@@ -43,6 +43,7 @@ data Storm = S {
     , ci :: [Ref]
     , fu :: [Acc]
     }
+
 eye = S 0 empty [] [] 
 
 loadAccounts :: [LFChannel] -> [Acc] 
@@ -54,13 +55,15 @@ la l = (our % tot, n)
           tot = (amount_msat::LFChannel->Msat) l 
           n = getNodeInt $ (peer_id::LFChannel->String) l 
 
-logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
 
+logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
 storm :: Pluug Storm -- :)     
+
 storm (Nothing, "coin_movement", v) = case (fromJSON v :: Result CoinMovement) of 
     Success (CoinMovement y) -> do 
         logy $ maybe 0 id $ (fees_msat :: Movement -> Maybe Int) y 
     _ -> pure ()  
+
 storm (Just i, "stormload", v) =  do 
     h <- lift ask 
     Just (Correct (Res n _)) <- liftIO $ allnodes h
@@ -80,10 +83,12 @@ storm (Just i, "stormload", v) =  do
         ,  "nodes" .= ord
         , "circles" .= length o
             ]) i
+
 storm (Just i, "stormwallet", v) = do 
     h <- lift ask
     Just (Correct (Res w _)) <- liftIO $ listfunds h 
     yield $ Res (summarizeFunds w) i 
+
 storm (Just i, "stormnetwork", v) = do 
     st <- lift.lift $ get
     yield $ Res (object [
@@ -102,14 +107,23 @@ storm (Just i, "stormnetwork", v) = do
                     . (map snd)  
                     . lsuc' 
                     $ n )
+
 storm (Just i, "stormdeploy", v) = do
     (S me g _ _) <- lift.lift $ get
     h <- lift ask 
     Just (Correct (Res w _)) <- liftIO $ listfunds h 
-    Just (Correct (Res ww _)) <- liftIO $ multifundchannel h $ deploy (outputs w) g me
-    yield $ Res (object ["test" .= ww ]) i 
-    
-        
+    ww <-liftIO $ deploy h (outputs w) g me 
+    -- yield $ Res (object ["jail" .= ww ]) i 
+    multifund <- liftIO $ multifundchannel h $ ww
+    case multifund of 
+        Just (Correct (Res mf _)) -> do 
+            logy mf 
+            yield $ Res (object ["suctest" .= mf ]) i 
+        otherwise -> do 
+            logy "failed" 
+            logy multifund
+            yield $ Res (object ["fail" .= True ]) i 
+
 
 storm (Just i, "stormpaths", v) = do 
     st <- lift.lift $ get
