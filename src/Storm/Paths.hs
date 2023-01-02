@@ -40,3 +40,5 @@ info = foldr pf (P (Fee 0 0) maxBound)
                 (Just x) -> minimum [(neck c), ((amount_msat::Channel->Msat) e), x]
                 otherwise -> min (neck c) ((amount_msat::Channel->Msat) e) 
             )
+
+

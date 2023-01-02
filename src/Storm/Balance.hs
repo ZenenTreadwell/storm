@@ -42,11 +42,11 @@ import Storm.Paths
 import Storm.Search 
 import Storm.Types 
 
-type Circle = (Attempts, PathInfo) 
+type Circle = (Ref, PathInfo) 
 type Attempts = [ ListSendPays ]  
 type Cha = TChan Ref
 
-loadCircles :: Gra -> Node -> [Acc] -> IO [Ref]
+-- loadCircles :: Gra -> Node -> [Acc] -> IO [Circle]
 loadCircles !g me a =
     let outs :: [Node]
         outs = map snd $ filter (\(r, _) -> r > 0.7) a
@@ -62,9 +62,16 @@ loadCircles !g me a =
                   q  = lo - la 
             in forkIO (spoon q c o) 
             ) outs
-        threadDelay $ (10 ^ 6) * 3
+        threadDelay $ (10 ^ 6) * 13
         mapM killThread threads
-        atomically $ collect c []
+        refs <- atomically $ collect c []
+        -- infos <- mapM (hydra me g) refs
+        pure refs  -- $ zip refs infos 
+
+-- hydra :: Node -> Gra -> Ref -> IO Way
+hydra me g ref = runReaderT (hydrate ref) (g, me, me) >>= \case
+    Left x -> undefined -- Empty 
+    Right y -> undefined -- y
 
 loop :: StateT (Int, Ref, Cha) Search () 
 loop = do 

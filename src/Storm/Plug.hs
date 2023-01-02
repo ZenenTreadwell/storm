@@ -29,13 +29,13 @@ import Data.Graph.Inductive.Graph
 import Data.Graph.Inductive.Query
 import Control.Monad.Reader 
 import Control.Concurrent hiding (yield)
-
+import qualified Data.Sequence as Q
 import Data.Text.Format.Numbers
 import Control.Lens hiding ((.=))
 import Data.Aeson.Lens
 import Data.Foldable 
 import Data.Ratio 
-
+import qualified Data.Map as M
 
 data Storm = S {
       me :: Node
@@ -96,8 +96,13 @@ storm (Just i, "stormnetwork", v) = do
         , "edges" .= size (gg st)
         , "capacity" .= (prettyI (Just ',') $ capacity (gg st) 0 )
         , "circles" .= (length $ ci st) 
+        , "levels" .= (foldr countlvls M.empty (level (me st) (gg st)) )
         ]) i
     where 
+        countlvls :: (Node, Int) -> M.Map Int Int -> M.Map Int Int
+        countlvls a b = case M.lookup (snd a) b of 
+            Just y -> M.insert (snd a) (y + 1) b
+            otherwise -> M.insert (snd a) 1 b  
         capacity :: Gra -> Msat -> Msat 
         capacity g t
             | isEmpty g = t
@@ -127,12 +132,13 @@ storm (Just i, "stormdeploy", v) = do
 
 storm (Just i, "stormpaths", v) = do 
     st <- lift.lift $ get
-    found <- liftIO $ runReaderT ( evalStateT (results w) (Empty,[]) 
+    found <- liftIO $ runReaderT ( evalStateT (results' w) (Empty,[]) 
         ) (gg st,x,y)
     yield $ Res (object [ 
-          "routes" .= found   
+          "routes" .= map route found   
         ]) i
         where 
+              route = (createRoute a) . toList 
               x = getNodeInt $ getArgStr 0 v
               y = getNodeInt $ getArgStr 1 v 
               a = getArgInt 2 v 1000000
