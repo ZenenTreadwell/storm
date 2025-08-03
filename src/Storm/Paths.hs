@@ -16,7 +16,7 @@ data PathInfo = P {
     } deriving (Generic, Show)
 instance ToJSON PathInfo 
 instance Eq PathInfo where 
-    (==) a b = (base.cost $ a) == (base.cost $ b) && (ppm.cost $ a) == (ppm.cost $ b)
+    (==) a b = (a.cost.base) == (b.cost.base) && (a.cost.ppm) == (b.cost.ppm)
 instance Ord PathInfo where 
     compare a b = compare (cost a) (cost b) 
 
@@ -33,12 +33,12 @@ info = foldr pf (P (Fee 0 0) maxBound)
     where 
         pf :: Channel -> PathInfo -> PathInfo 
         pf e c = P 
-            (Fee ( (base.cost) c + base_fee_millisatoshi e )
-                 (((ppm.cost) c) + fee_per_millionth e ) 
+            (Fee ( c.cost.base + base_fee_millisatoshi e )
+                 ((c.cost.ppm) + fee_per_millionth e ) 
             )
             (case htlc_maximum_msat e of 
-                (Just x) -> minimum [(neck c), ((amount_msat::Channel->Msat) e), x]
-                otherwise -> min (neck c) ((amount_msat::Channel->Msat) e) 
+                (Just x) -> minimum [(neck c), (e.amount_msat), x]
+                otherwise -> min (neck c) (e.amount_msat) 
             )
 
 

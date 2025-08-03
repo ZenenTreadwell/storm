@@ -39,7 +39,7 @@ results :: Int -> StateT (Ref, [Ref]) Search [Ref]
 results x = do 
     (r , c) <- get
     (_, r') <- lift $ search r
-    put (increment.chop $ r', r' : c) 
+    put (increment . chop $ r', r' : c) 
     if x > length c 
         then results x 
         else return c
@@ -58,7 +58,7 @@ finally (r, w) = do
     (g, n, v) <- ask 
     oo <- outgoing w 
     let {
-        f = dropWhile (not.(== v).fst) oo;
+        f = dropWhile (not . (== v) . fst) oo;
         lo = length oo; 
         la = length f ;
         rr = lo - la 
@@ -69,7 +69,7 @@ finally (r, w) = do
 
 nextr :: Ref -> Deref -> Ref 
 nextr r (r', c)  
-    | z == Q.length r = extend.increment.chop $ r
+    | z == Q.length r = extend . increment . chop $ r
     | z == 0 = extendTo (Q.length r + 1) Empty
     | otherwise = extendTo (Q.length r) $ increment $ Q.take z r
     where z = Q.length c
@@ -109,7 +109,7 @@ extendTo x r
     | otherwise = extendTo x $ extend r
         
 toNode :: Channel -> Node
-toNode = getNodeInt.(destination :: Channel -> String) 
+toNode = getNodeInt . (.destination) 
 
 -- prior art ~ extra 1.7.12
 -- foldr with 3 arg, voodoo shit

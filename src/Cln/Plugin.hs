@@ -65,10 +65,40 @@ plugin manif s p = do
                     _ -> pure ()  
                 else pure () 
 
-            Nothing -> pure ()
+            Nothing -> do
+    		loggy "init failed"
+		pure ()
 
     threadDelay maxBound
     where 
+    runPlug s p h = evalStateT (runReaderT (runForever p ) h ) s
+
+-- runPlug s p h = evalStateT (runReaderT (runForever p ) h ) s
+
+initialize s p = do
+    loggy "check for init"
+    -- (Just (Right (Just i, m, v))) 
+    init <- await 
+    case init of
+        (Just x) -> do
+    	    let (Right (Just i, m, v)) = x
+            if m == "init" then case fromJSON v :: Result Init of
+                (Success x) ->  do
+                    soc <- liftIO $ socket AF_UNIX Stream 0
+                    liftIO $ N.connect soc $ SockAddrUnix $ 
+                        x.configuration.lightning5dir
+                            <> "/" <> (x.configuration.rpc5file)
+                    h <- liftIO $ socketToHandle soc ReadWriteMode
+                    liftIO $ forkIO $ runPlug s p h 
+                    rc i 
+                _ -> pure ()  
+            else pure () 
+
+        _ -> pure ()
+
+	-- recur until initialization is complete - bad idea
+        -- _ -> initialize s p
+    where
     runPlug s p h = evalStateT (runReaderT (runForever p ) h ) s
 
 a :: (Monad n) => ConduitT (Fin (Req Value)) (Either (Res Value) (Maybe Id, Method, Params))  n () 

@@ -20,6 +20,7 @@ dependencies:
 - lens-aeson
 - lens
 - attoparsec
+- attoparsec-aeson
 - conduit 
 - network 
 - transformers 
@@ -35,6 +36,8 @@ dependencies:
 
 library:
   source-dirs: src
+  default-extensions:
+    - OverloadedRecordDot
 
 executables:
   storm:

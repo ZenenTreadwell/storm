@@ -51,12 +51,12 @@ loadAccounts = map la
 
 la :: LFChannel -> Acc 
 la l = (our % tot, n) 
-    where our = our_amount_msat l
-          tot = (amount_msat::LFChannel->Msat) l 
-          n = getNodeInt $ (peer_id::LFChannel->String) l 
+    where our = l.our_amount_msat
+          tot = l.amount_msat
+          n = getNodeInt $ l.peer_id
 
 
-logy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
+logy m = liftIO $ System.IO.appendFile "/home/zen/.ao/storm" $ show m <> "\n"
 storm :: Pluug Storm -- :)     
 
 storm (Nothing, "coin_movement", v) = case (fromJSON v :: Result CoinMovement) of 
@@ -64,25 +64,25 @@ storm (Nothing, "coin_movement", v) = case (fromJSON v :: Result CoinMovement) o
         logy $ maybe 0 id $ (fees_msat :: Movement -> Maybe Int) y 
     _ -> pure ()  
 
-storm (Just i, "stormload", v) =  do 
-    h <- lift ask 
-    Just (Correct (Res n _)) <- liftIO $ allnodes h
-    Just (Correct (Res c _)) <- liftIO $ allchannels h
-    Just (Correct (Res fo _)) <- liftIO $ getinfo h 
-    Just (Correct (Res w _)) <- liftIO $ listfunds h 
-    let {
-        m = getNodeInt $ __id fo ; 
-        g = loadGraph n c ;
-        ord = order g ; 
-        a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
-         }
-    o <- liftIO $ loadCircles g m a
-    lift.lift $ put $ S m g o a 
-    yield $ Res (object [ 
-          "loaded" .= True
-        ,  "nodes" .= ord
-        , "circles" .= length o
-            ]) i
+-- storm (Just i, "stormload", v) =  do 
+--     h <- lift ask 
+--     Just (Correct (Res n _)) <- liftIO $ allnodes h
+--     Just (Correct (Res c _)) <- liftIO $ allchannels h
+--     Just (Correct (Res fo _)) <- liftIO $ getinfo h 
+--     Just (Correct (Res w _)) <- liftIO $ listfunds h 
+--     let {
+--         m = getNodeInt $ __id fo ; 
+--         g = loadGraph n c ;
+--         ord = order g ; 
+--         a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
+--          }
+--     o <- liftIO $ loadCircles g m a
+--     lift.lift $ put $ S m g o a 
+--     yield $ Res (object [ 
+--           "loaded" .= True
+--         ,  "nodes" .= ord
+--         , "circles" .= length o
+--             ]) i
 
 storm (Just i, "stormwallet", v) = do 
     h <- lift ask
@@ -90,7 +90,7 @@ storm (Just i, "stormwallet", v) = do
     yield $ Res (summarizeFunds w) i 
 
 storm (Just i, "stormnetwork", v) = do 
-    st <- lift.lift $ get
+    st <- lift . lift $ get
     yield $ Res (object [
           "nodes" .= order (gg st)  
         , "edges" .= size (gg st)
@@ -108,13 +108,13 @@ storm (Just i, "stormnetwork", v) = do
             | isEmpty g = t
             | otherwise = case matchAny g of
                 (n, g') -> capacity g' $ t + ( sum 
-                    . (map (amount_msat::Channel -> Msat)) 
+                    . (map (.amount_msat)) 
                     . (map snd)  
                     . lsuc' 
                     $ n )
 
 storm (Just i, "stormdeploy", v) = do
-    (S me g _ _) <- lift.lift $ get
+    (S me g _ _) <- lift . lift $ get
     h <- lift ask 
     Just (Correct (Res w _)) <- liftIO $ listfunds h 
     ww <-liftIO $ deploy h (outputs w) g me 
@@ -131,7 +131,7 @@ storm (Just i, "stormdeploy", v) = do
 
 
 storm (Just i, "stormpaths", v) = do 
-    st <- lift.lift $ get
+    st <- lift . lift $ get
     found <- liftIO $ runReaderT ( evalStateT (results' w) (Empty,[]) 
         ) (gg st,x,y)
     yield $ Res (object [ 
@@ -158,7 +158,7 @@ manifest = object [
     "dynamic" .= True,
     "rpcmethods" .= ([
           RpcMethod "stormwallet" "" "print summary info" Nothing False 
-        , RpcMethod "stormload" "" "Load into memory (deprecating)" Nothing False  
+        -- , RpcMethod "stormload" "" "Load into memory (deprecating)" Nothing False  
         , RpcMethod "stormnetwork" "" "network summary info" Nothing False  
         , RpcMethod "stormpaths" "[n1, n2, a, p]" "Find p paths from n1 to n2 of amount a" Nothing False
         , RpcMethod "stormdeploy" "" "multiopen" Nothing False    

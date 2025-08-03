@@ -32,7 +32,7 @@ import Storm.Graph
 import Storm.Search 
 import Storm.Types
 
-loggy m = liftIO $ System.IO.appendFile "/home/o/.ao/storm" $ show m <> "\n"
+loggy m = liftIO $ System.IO.appendFile "/home/zen/.ao/storm" $ show m <> "\n"
 
 ize :: Sat 
 ize = 7654321
@@ -40,7 +40,7 @@ ize = 7654321
 deploy :: Handle -> [LFOutput] -> Gra -> Node -> IO Destinations
 deploy h lfo g me = 
     let cand = findCand g me
-        amm = flip div 1000 $ sum $ map (amount_msat :: LFOutput -> Msat) lfo 
+        amm = flip div 1000 $ sum $ map (.amount_msat) lfo 
         xg :: StateT (Sat, Destinations, Destinations) IO Destinations
         xg = do 
             (a, c, r) <- get
@@ -51,11 +51,11 @@ deploy h lfo g me =
                         con <- liftIO $ connect' h $  ___________id c'
                         case con of 
                             Just (Correct (Res w _)) -> do
-                                loggy $ "correct peer" <> (show.length) r
+                                loggy $ "correct peer" <> (show . length) r
                                 put (a - ize, cx, c':r) 
                                 xg
                             otherwise -> do 
-                                loggy $ "failed connect" <> (show.length) cx
+                                loggy $ "failed connect" <> (show . length) cx
                                 put (a, cx, r) 
                                 xg
                     else pure r

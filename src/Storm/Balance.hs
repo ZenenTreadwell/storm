@@ -56,7 +56,7 @@ loadCircles !g me a =
         c <- newTChanIO 
         threads <- mapConcurrently (\o ->
             let   oo = suc g me 
-                  le = dropWhile (not.(== o)) oo
+                  le = dropWhile (not . (== o)) oo
                   la = length le
                   lo = length oo
                   q  = lo - la 
@@ -78,7 +78,7 @@ loop = do
     (q, r, c) <- get
     (_, r') <- lift $ search r
     liftIO $ atomically $ writeTChan c (q <| r') 
-    put (q, increment.chop $ r', c) 
+    put (q, increment . chop $ r', c) 
     loop 
 
 collect c x = (tryReadTChan c) >>= \case 

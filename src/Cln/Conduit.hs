@@ -19,6 +19,7 @@ import Control.Monad
 import Control.Monad.Trans (lift)
 import Data.Aeson.Types hiding ( parse )
 import Data.Aeson 
+import Data.Aeson.Parser
 import qualified Data.ByteString as S
 import Data.Conduit 
 import Data.Attoparsec.ByteString

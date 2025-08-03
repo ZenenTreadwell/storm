@@ -18,19 +18,22 @@ type Cxt = Context NodeInfo Channel
 type MCxt = MContext NodeInfo Channel
 type Dcp = (MCxt, Gra) 
 
-loadGraph :: ListNodes -> ListChannels -> Gra 
-loadGraph n c = mkGraph (map toLNode nx) (map toLEdge' cx)
-    where 
-        cx = (channels::ListChannels->[Channel]) c
-        nx = (_nodes :: ListNodes -> [NodeInfo]) n 
-        toLNode ni = ( (getNodeInt.nodeid) ni , ni)
-        toLEdge' c = (
-            ( getNodeInt.source) c
-          , (getNodeInt.(destination::Channel->String)) c
-          , c
-          )
+-- Commenting this out for now; I'm not sure how to debug it and
+-- I think I'll learn when I need to
+
+-- loadGraph :: ListNodes -> ListChannels -> Gra 
+-- loadGraph n c = mkGraph (map toLNode nx) (map toLEdge' cx)
+--     where 
+--         cx = c.channels
+--         nx = n._nodes
+--         toLNode ni = ((getNodeInt ni.nodeid), ni)
+--         toLEdge' c = (
+--             getNodeInt c.source
+--           , getNodeInt c.destination
+--           , c
+--           )
 
 getNodeInt :: String -> Node
-getNodeInt s = case readHex.filter isHexDigit $ s of 
+getNodeInt s = case readHex . filter isHexDigit $ s of 
     ([]) -> 0 
     (x:_)-> fst x

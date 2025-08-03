@@ -17,9 +17,9 @@ createRoute a c = foldr (addHop a) [] $ pairUp c
 
         addHop :: Msat -> (Channel, Channel) -> [Route] -> [Route]
         addHop a (cp, c)  r = Route
-            ((destination::Channel->String) cp)
-            ((short_channel_id::Channel->String) cp)
-            (getDirect (source cp) ((destination::Channel->String) cp))
+            (cp.destination)
+            (cp.short_channel_id)
+            (getDirect (cp.source) (cp.destination))
             (getAmount a c r)
             (getDelay c r)
             "tlv"
@@ -30,7 +30,7 @@ createRoute a c = foldr (addHop a) [] $ pairUp c
 
         getDelay :: Channel -> [Route] -> Int
         getDelay e [] = 9
-        getDelay e (r:_) = (delay::Route->Int) r + (delay::Channel->Int) e
+        getDelay e (r:_) = r.delay + e.delay
         
         getAmount :: Msat -> Channel -> [Route] -> Msat
         getAmount a e [] = a
@@ -41,7 +41,7 @@ createRoute a c = foldr (addHop a) [] $ pairUp c
                 num = (mil * toInteger nextAmount * toInteger ppmrate)
                 denum = mil*mil
                 ppmfee  = fromInteger $ div num denum
-                nextAmount = maximum $ map (amount_msat::Route->Msat) r
+                nextAmount = maximum $ map (.amount_msat) r
             in sum [ nextAmount , basefee , ppmfee ]
 
 
