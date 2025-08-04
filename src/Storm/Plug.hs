@@ -64,25 +64,25 @@ storm (Nothing, "coin_movement", v) = case (fromJSON v :: Result CoinMovement) o
         logy $ maybe 0 id $ (fees_msat :: Movement -> Maybe Int) y 
     _ -> pure ()  
 
--- storm (Just i, "stormload", v) =  do 
---     h <- lift ask 
---     Just (Correct (Res n _)) <- liftIO $ allnodes h
---     Just (Correct (Res c _)) <- liftIO $ allchannels h
---     Just (Correct (Res fo _)) <- liftIO $ getinfo h 
---     Just (Correct (Res w _)) <- liftIO $ listfunds h 
---     let {
---         m = getNodeInt $ __id fo ; 
---         g = loadGraph n c ;
---         ord = order g ; 
---         a = loadAccounts $ (channels :: ListFunds -> [LFChannel]) w ;
---          }
---     o <- liftIO $ loadCircles g m a
---     lift.lift $ put $ S m g o a 
---     yield $ Res (object [ 
---           "loaded" .= True
---         ,  "nodes" .= ord
---         , "circles" .= length o
---             ]) i
+storm (Just i, "stormload", v) =  do 
+    h <- lift ask 
+    Just (Correct (Res n _)) <- liftIO $ allnodes h
+    Just (Correct (Res c _)) <- liftIO $ allchannels h
+    Just (Correct (Res fo _)) <- liftIO $ getinfo h 
+    Just (Correct (Res w _)) <- liftIO $ listfunds h 
+    let {
+        m = getNodeInt $ __id fo ; 
+        g = loadGraph n c ;
+        ord = order g ; 
+        a = loadAccounts $ w.channels ;
+         }
+    o <- liftIO $ loadCircles g m a
+    lift . lift $ put $ S m g o a 
+    yield $ Res (object [ 
+          "loaded" .= True
+        ,  "nodes" .= ord
+        , "circles" .= length o
+            ]) i
 
 storm (Just i, "stormwallet", v) = do 
     h <- lift ask
@@ -151,6 +151,7 @@ storm (Just i, "stormpaths", v) = do
               getArgInt i v d = case v ^? ( (nth i) . _Integer) of 
                   Just b -> (fromInteger b)   
                   Nothing -> d 
+
 storm x = logy "unhandled" >> logy x 
 
 manifest :: Value
@@ -158,7 +159,7 @@ manifest = object [
     "dynamic" .= True,
     "rpcmethods" .= ([
           RpcMethod "stormwallet" "" "print summary info" Nothing False 
-        -- , RpcMethod "stormload" "" "Load into memory (deprecating)" Nothing False  
+        , RpcMethod "stormload" "" "Load into memory (deprecating)" Nothing False
         , RpcMethod "stormnetwork" "" "network summary info" Nothing False  
         , RpcMethod "stormpaths" "[n1, n2, a, p]" "Find p paths from n1 to n2 of amount a" Nothing False
         , RpcMethod "stormdeploy" "" "multiopen" Nothing False    
