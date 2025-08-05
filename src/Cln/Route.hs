@@ -13,7 +13,7 @@ createRoute a c = foldr (addHop a) [] $ pairUp c
         pairUp :: [Channel] -> [(Channel,Channel)]
         pairUp [] = []
         pairUp (a:[]) = [(a,a)]
-        pairUp (a:b) = (a,head b) : pairUp b
+        pairUp (a:b:c) = (a,b) : pairUp c 
 
         addHop :: Msat -> (Channel, Channel) -> [Route] -> [Route]
         addHop a (cp, c)  r = Route

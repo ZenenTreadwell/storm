@@ -42,7 +42,7 @@ instance ToJSON Hook where
     toJSON = genericToJSON defaultOptions{omitNothingFields = True}
 
 data Notification = Notification { 
-    __method :: Text
+    method :: Text
   } deriving Generic
 instance ToJSON Notification where 
     toJSON = genericToJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')}
@@ -78,7 +78,7 @@ instance FromJSON CoinMovement
 data Movement = Movement {
       version :: Int 
     , node_id :: String 
-    , __type :: String 
+    , _type :: String 
     , account_id :: String
     , originating_account :: Maybe String 
     , txid :: Maybe String 
@@ -100,8 +100,8 @@ instance FromJSON Movement where
     parseJSON v = genericParseJSON defaultOptions{fieldLabelModifier = dropWhile (=='_')} v
 
 data Init = Init {
-      --options :: Value
-     configuration :: InitConfig
+     options :: Value
+     , configuration :: InitConfig
     } deriving (Show, Generic) 
 instance FromJSON Init
 instance ToJSON Init
@@ -282,7 +282,7 @@ data SetChannel = SetChannel {
 instance FromJSON SetChannel  
 
 data Features = Features {
-      __init :: String
+      init :: String
     , node :: String 
     , channel :: String 
     , invoice :: String 

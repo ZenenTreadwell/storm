@@ -13,6 +13,8 @@ description: test
 
 dependencies:
 - base >= 4.7 && < 5
+- filepath
+- directory
 - fgl
 - aeson 
 - lens-aeson
