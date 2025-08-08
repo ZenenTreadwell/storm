@@ -30,7 +30,7 @@ results' :: Int -> StateT (Ref, [Way]) Search [Way]
 results' x = do  
     (r , c) <- get
     (w, r') <- lift $ search r
-    put (increment.chop $ r', w : c) 
+    put (increment . chop $ r', w : c) 
     if x > length c 
         then results' x 
         else return c
